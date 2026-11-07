@@ -1,1629 +1,485 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XAU JOURNAL — Trading Journal (Google Sheets Sync)</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js for Visualizations -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Reference Style Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Manrope:wght@200..800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <style>
-        :root {
-            color-scheme: light;
-            --bg: #f5f4f0;
-            --surface: #fffefa;
-            --surface-soft: #efeee8;
-            --text: #171815;
-            --muted: #777970;
-            --line: #e5e3dc;
-            --accent: #a8874e;
-            --accent-soft: #eee5d5;
-            --shadow: 0 18px 60px rgba(28, 27, 22, .055);
-            --gold: #d4af37;
-            --tjl: #8b5cf6;
-            --qml: #06b6d4;
-            --lqs: #f59e0b;
-        }
-        :root[data-theme="dark"] {
-            color-scheme: dark;
-            --bg: #10110f;
-            --surface: #191a17;
-            --surface-soft: #22231f;
-            --text: #f2f0e9;
-            --muted: #a09f95;
-            --line: #30312b;
-            --accent: #c6a66c;
-            --accent-soft: #332c20;
-            --shadow: 0 18px 60px rgba(0, 0, 0, .2);
-            --gold: #e5c158;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: "DM Sans", sans-serif;
-            transition: background-color .25s ease, color .25s ease;
-        }
-
-        h1, h2, h3, .font-heading {
-            font-family: "Manrope", sans-serif;
-        }
-
-        .font-mono {
-            font-family: "JetBrains Mono", monospace;
-        }
-
-        .ref-surface {
-            background-color: var(--surface);
-            border: 1px solid var(--line);
-        }
-
-        .ref-surface-soft {
-            background-color: var(--surface-soft);
-            border: 1px solid var(--line);
-        }
-
-        .ref-border {
-            border-color: var(--line);
-        }
-
-        .ref-text-accent {
-            color: var(--accent);
-        }
-
-        .ref-text-muted {
-            color: var(--muted);
-        }
-
-        /* Custom scrollbar matching reference design */
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
-        }
-        ::-webkit-scrollbar-track {
-            background: var(--bg);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--line);
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent);
-        }
-
-        .btn-accent {
-            background-color: var(--accent);
-            color: #ffffff;
-            transition: opacity 0.2s;
-        }
-        .btn-accent:hover {
-            opacity: 0.9;
-        }
-    </style>
-</head>
-<body class="h-full w-full overflow-hidden flex flex-col antialiased select-none">
-
-    <!-- Top Header Bar -->
-    <header class="h-16 border-b ref-border ref-surface shrink-0 flex items-center justify-between px-6 z-20">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 flex items-center justify-center border border-[var(--accent)] text-[var(--accent)] font-extrabold text-sm tracking-tighter">
-                SD
-            </div>
-            <h1 class="font-bold text-sm tracking-widest text-[var(--text)] uppercase flex items-center gap-2">
-                XAU JOURNAL
-            </h1>
-        </div>
-
-        <!-- Sync Status Indicator & Sheet Settings Trigger (Hidden) -->
-        <div class="hidden items-center gap-3">
-            <div id="syncStatus" class="flex items-center gap-2 text-xs px-2.5 py-1 rounded bg-[var(--surface-soft)] border ref-border font-mono">
-                <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span id="syncText" class="text-[11px] ref-text-muted">Auto Sync Active</span>
-            </div>
-            <!-- Read Only Badge -->
-            <span class="text-xs font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5 font-mono">
-                <i data-lucide="lock" class="w-3 h-3"></i> READ-ONLY
-            </span>
-        </div>
-
-        <!-- Right Quick Actions & Theme Toggle -->
-        <div class="flex items-center gap-3">
-            <button id="themeToggle" class="w-9 h-9 border ref-border ref-surface rounded-full flex items-center justify-center hover:border-[var(--accent)] transition-colors text-[var(--text)]" title="Toggle Theme">
-                <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
-                <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Main Layout Container -->
-    <div class="flex flex-1 overflow-hidden relative">
-
-        <!-- Sidebar Navigation -->
-        <aside class="w-16 md:w-56 ref-surface border-r ref-border flex flex-col justify-between shrink-0 z-10">
-            <nav class="p-3 space-y-1">
-                <button data-page="dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Dashboard</span>
-                </button>
-                <button data-page="trades" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="list-ordered" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Trade Logs</span>
-                </button>
-                <button data-page="calendar" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="calendar" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Calendar</span>
-                </button>
-                <div class="pt-3 pb-1 border-t ref-border my-2 hidden md:block">
-                    <span class="px-3 text-[9px] font-bold text-[var(--accent)] tracking-widest uppercase">Analytics</span>
-                </div>
-                <button data-page="monthly" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="calendar-days" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Monthly</span>
-                </button>
-                <button data-page="yearly" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="line-chart" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Yearly</span>
-                </button>
-                <button data-page="lifetime" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-soft)] transition-all font-medium text-xs tracking-wider uppercase">
-                    <i data-lucide="award" class="w-4 h-4 shrink-0"></i>
-                    <span class="hidden md:inline">Lifetime</span>
-                </button>
-            </nav>
-
-            
-        </aside>
-
-        <!-- Viewport Workspace / Views Wrapper -->
-        <main class="flex-1 overflow-hidden relative">
-
-            <!-- PAGE 1: DASHBOARD -->
-            <section id="page-dashboard" class="page-view absolute inset-0 p-4 md:p-6 overflow-y-auto space-y-5 hidden">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                        <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Executive Overview</div>
-                        <h2 class="text-xl font-bold text-[var(--text)]">Dashboard Metrics</h2>
-                    </div>
-                </div>
-
-                <!-- Core Stats Cards -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="ref-surface p-4 rounded flex flex-col justify-between">
-                        <div class="flex justify-between items-center ref-text-muted mb-1 text-xs">
-                            <span class="font-medium uppercase tracking-wider">Net Profit / Loss</span>
-                            <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-500"></i>
-                        </div>
-                        <div id="dash-net-pnl" class="text-xl md:text-2xl font-bold font-mono">$0.00</div>
-                        <div id="dash-net-r" class="text-xs ref-text-muted mt-1 font-mono">0.0 R</div>
-                    </div>
-
-                    <div class="ref-surface p-4 rounded flex flex-col justify-between">
-                        <div class="flex justify-between items-center ref-text-muted mb-1 text-xs">
-                            <span class="font-medium uppercase tracking-wider">Win Rate</span>
-                            <i data-lucide="percent" class="w-4 h-4 text-[var(--accent)]"></i>
-                        </div>
-                        <div id="dash-winrate" class="text-xl md:text-2xl font-bold font-mono">0%</div>
-                        <div id="dash-win-ratio" class="text-xs ref-text-muted mt-1">0 W / 0 L</div>
-                    </div>
-
-                    <div class="ref-surface p-4 rounded flex flex-col justify-between">
-                        <div class="flex justify-between items-center ref-text-muted mb-1 text-xs">
-                            <span class="font-medium uppercase tracking-wider">Total Trades</span>
-                            <i data-lucide="activity" class="w-4 h-4 text-purple-400"></i>
-                        </div>
-                        <div id="dash-total-trades" class="text-xl md:text-2xl font-bold font-mono">0</div>
-                        <div id="dash-avg-rr" class="text-xs ref-text-muted mt-1 font-mono">Avg RR: 1:0</div>
-                    </div>
-
-                    <div class="ref-surface p-4 rounded flex flex-col justify-between">
-                        <div class="flex justify-between items-center ref-text-muted mb-1 text-xs">
-                            <span class="font-medium uppercase tracking-wider">Profit Factor</span>
-                            <i data-lucide="trending-up" class="w-4 h-4 text-amber-500"></i>
-                        </div>
-                        <div id="dash-profit-factor" class="text-xl md:text-2xl font-bold font-mono">0.00</div>
-                        <div class="text-xs ref-text-muted mt-1">Expectancy: <span id="dash-expectancy" class="font-mono">$0</span></div>
-                    </div>
-                </div>
-
-                <!-- Charts Section -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <!-- Equity Curve -->
-                    <div class="lg:col-span-2 ref-surface p-4 rounded flex flex-col h-72">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)]">Equity Growth Curve</h3>
-                            <span class="text-[10px] ref-text-muted ref-surface-soft px-2 py-0.5 rounded border ref-border font-mono">Cumulative Profit</span>
-                        </div>
-                        <div class="flex-1 relative w-full h-full">
-                            <canvas id="equityChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Setup Breakdown Chart -->
-                    <div class="ref-surface p-4 rounded flex flex-col h-72">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)]">Setup Share</h3>
-                            <span class="text-[10px] ref-text-muted ref-surface-soft px-2 py-0.5 rounded border ref-border font-mono">TJL / QML / LQS</span>
-                        </div>
-                        <div class="flex-1 relative w-full h-full min-h-0 flex items-center justify-center px-2 pt-1 pb-2">
-                            <canvas id="setupPieChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Setup Performance Summary Table -->
-                <div class="ref-surface rounded p-4">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-3">Setup Metrics Breakdown</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left">
-                            <thead class="ref-text-muted uppercase text-[10px] tracking-wider ref-surface-soft border-b ref-border">
-                                <tr>
-                                    <th class="py-2.5 px-3">Setup</th>
-                                    <th class="py-2.5 px-3">Trades</th>
-                                    <th class="py-2.5 px-3">Win Rate</th>
-                                    <th class="py-2.5 px-3">Total PnL</th>
-                                    <th class="py-2.5 px-3">Total R</th>
-                                    <th class="py-2.5 px-3">Avg Risk/Reward</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dash-setup-table" class="divide-y ref-border font-mono">
-                                <!-- JS Injected -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PAGE 2: TRADES LIST & FILTER -->
-            <section id="page-trades" class="page-view absolute inset-0 p-4 md:p-6 flex flex-col hidden space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                    <div>
-                        <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Execution Log</div>
-                        <h2 class="text-xl font-bold text-[var(--text)]">Trade History</h2>
-                    </div>
-                    <!-- Filters -->
-                    <div class="flex flex-wrap items-center gap-2">
-                        <select id="filter-setup" class="ref-surface border ref-border text-xs text-[var(--text)] px-3 py-2 rounded focus:outline-none focus:border-[var(--accent)]">
-                            <option value="ALL">All Setups</option>
-                            <option value="TJL">TJL Setup</option>
-                            <option value="QML">QML Setup</option>
-                            <option value="LQS">LQS Setup</option>
-                        </select>
-                        <select id="filter-outcome" class="ref-surface border ref-border text-xs text-[var(--text)] px-3 py-2 rounded focus:outline-none focus:border-[var(--accent)]">
-                            <option value="ALL">All Outcomes</option>
-                            <option value="WIN">Wins</option>
-                            <option value="LOSS">Losses</option>
-                            <option value="BE">Break Even</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Scrollable Table Container -->
-                <div class="flex-1 ref-surface rounded overflow-hidden flex flex-col">
-                    <div class="overflow-x-auto overflow-y-auto flex-1">
-                        <table class="w-full text-xs text-left text-[var(--text)]">
-                            <thead class="ref-text-muted uppercase text-[10px] tracking-wider ref-surface-soft sticky top-0 border-b ref-border z-10">
-                                <tr>
-                                    <th class="py-3 px-4">Date</th>
-                                    <th class="py-3 px-4">Pair</th>
-                                    <th class="py-3 px-4">Type</th>
-                                    <th class="py-3 px-4">Setup</th>
-                                    <th class="py-3 px-4">Entry / SL / TP</th>
-                                    <th class="py-3 px-4">Outcome</th>
-                                    <th class="py-3 px-4">Risk ($)</th>
-                                    <th class="py-3 px-4">PnL ($)</th>
-                                    <th class="py-3 px-4">R Return</th>
-                                    <th class="py-3 px-4">Chart</th>
-                                    <th class="py-3 px-4">Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trades-table-body" class="divide-y ref-border font-mono">
-                                <!-- JS Injected -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PAGE 3: CALENDAR VIEW -->
-            <section id="page-calendar" class="page-view absolute inset-0 p-4 md:p-6 flex flex-col hidden space-y-4">
-                <div class="flex justify-between items-center shrink-0">
-                    <div>
-                        <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Daily Matrix</div>
-                        <h2 class="text-xl font-bold text-[var(--text)]">Performance Calendar</h2>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button id="cal-prev" class="p-1.5 ref-surface border ref-border rounded hover:border-[var(--accent)] text-[var(--text)]">
-                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                        </button>
-                        <span id="cal-month-year" class="text-xs font-bold text-[var(--text)] px-2 font-mono uppercase"></span>
-                        <button id="cal-next" class="p-1.5 ref-surface border ref-border rounded hover:border-[var(--accent)] text-[var(--text)]">
-                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Calendar Grid Container -->
-                <div class="flex-1 ref-surface rounded p-3 flex flex-col overflow-hidden">
-                    <div class="grid grid-cols-7 gap-1 text-center font-bold text-[10px] uppercase text-[var(--accent)] tracking-widest py-1 border-b ref-border">
-                        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-                    </div>
-                    <div id="calendar-grid" class="grid grid-cols-7 gap-1 flex-1 overflow-y-auto mt-2">
-                        <!-- JS Injected Calendar Days -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- PAGE 4: MONTHLY ANALYSIS -->
-            <section id="page-monthly" class="page-view absolute inset-0 p-4 md:p-6 overflow-y-auto space-y-5 hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Period Analytics</div>
-                        <h2 class="text-xl font-bold text-[var(--text)]">Monthly Breakdown</h2>
-                    </div>
-                    <!-- Selective Month and Year Filters -->
-                    <div class="flex items-center gap-2">
-                        <select id="monthly-select-month" class="ref-surface border ref-border text-xs text-[var(--text)] px-3 py-2 rounded focus:outline-none focus:border-[var(--accent)]">
-                            <option value="ALL">All Months</option>
-                            <option value="01">January</option>
-                            <option value="02">February</option>
-                            <option value="03">March</option>
-                            <option value="04">April</option>
-                            <option value="05">May</option>
-                            <option value="06">June</option>
-                            <option value="07">July</option>
-                            <option value="08">August</option>
-                            <option value="09">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-                        <select id="monthly-select-year" class="ref-surface border ref-border text-xs text-[var(--text)] px-3 py-2 rounded focus:outline-none focus:border-[var(--accent)] font-mono">
-                            <!-- Populated dynamically by JS -->
-                        </select>
-                    </div>
-                </div>
-
-                <div class="ref-surface p-4 rounded">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-3">Monthly Net Profit</h3>
-                    <div class="h-64 relative w-full">
-                        <canvas id="monthlyBarChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="ref-surface rounded p-4">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-3">Monthly Summary Table</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left">
-                            <thead class="ref-text-muted uppercase text-[10px] tracking-wider ref-surface-soft border-b ref-border">
-                                <tr>
-                                    <th class="py-2.5 px-3">Month</th>
-                                    <th class="py-2.5 px-3">Trades</th>
-                                    <th class="py-2.5 px-3">Win Rate</th>
-                                    <th class="py-2.5 px-3">PnL ($)</th>
-                                    <th class="py-2.5 px-3">R-Multiple</th>
-                                    <th class="py-2.5 px-3">Top Setup</th>
-                                </tr>
-                            </thead>
-                            <tbody id="monthly-table-body" class="divide-y ref-border font-mono">
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PAGE 5: YEARLY ANALYSIS -->
-            <section id="page-yearly" class="page-view absolute inset-0 p-4 md:p-6 overflow-y-auto space-y-5 hidden">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Macro Review</div>
-                        <h2 class="text-xl font-bold text-[var(--text)]">Yearly Progression</h2>
-                    </div>
-                    <!-- Selective Year Filter -->
-                    <div class="flex items-center gap-2">
-                        <select id="yearly-select-year" class="ref-surface border ref-border text-xs text-[var(--text)] px-3 py-2 rounded focus:outline-none focus:border-[var(--accent)] font-mono">
-                            <!-- Populated dynamically by JS -->
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                    <div class="ref-surface p-4 rounded flex flex-col h-72">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-2">Yearly Net PnL ($)</h3>
-                        <div class="flex-1 relative w-full h-full">
-                            <canvas id="yearlyBarChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="ref-surface p-4 rounded flex flex-col h-72">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-2">Setup Distribution</h3>
-                        <div class="flex-1 relative w-full h-full flex items-center justify-center">
-                            <canvas id="yearlySetupChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ref-surface rounded p-4">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-3">Year-by-Year Table</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs text-left">
-                            <thead class="ref-text-muted uppercase text-[10px] tracking-wider ref-surface-soft border-b ref-border">
-                                <tr>
-                                    <th class="py-2.5 px-3">Year</th>
-                                    <th class="py-2.5 px-3">Total Trades</th>
-                                    <th class="py-2.5 px-3">Win Rate</th>
-                                    <th class="py-2.5 px-3">Total PnL ($)</th>
-                                    <th class="py-2.5 px-3">Total R</th>
-                                </tr>
-                            </thead>
-                            <tbody id="yearly-table-body" class="divide-y ref-border font-mono">
-                                <!-- Injected by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PAGE 6: LIFETIME ANALYSIS -->
-            <section id="page-lifetime" class="page-view absolute inset-0 p-4 md:p-6 overflow-y-auto space-y-5 hidden">
-                <div>
-                    <div class="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">Strategy Analytics</div>
-                    <h2 class="text-xl font-bold text-[var(--text)]">Lifetime Setup Matrix</h2>
-                </div>
-
-                <!-- Deep Stats Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- TJL Card -->
-                    <div class="ref-surface rounded p-4 border-l-4 border-l-purple-500 relative overflow-hidden">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-bold text-purple-400 tracking-widest uppercase">TJL SETUP</span>
-                            <span class="text-[10px] text-purple-300 font-semibold px-2 py-0.5 rounded bg-purple-500/10">Targeted Level</span>
-                        </div>
-                        <div class="space-y-2 text-xs font-mono">
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total Trades</span>
-                                <span id="lt-tjl-count" class="font-bold text-[var(--text)]">0</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Win Rate</span>
-                                <span id="lt-tjl-wr" class="font-bold text-[var(--text)]">0%</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total PnL</span>
-                                <span id="lt-tjl-pnl" class="font-bold text-emerald-500">$0.00</span>
-                            </div>
-                            <div class="flex justify-between py-1">
-                                <span class="ref-text-muted">Total R</span>
-                                <span id="lt-tjl-r" class="font-bold text-purple-400">0 R</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- QML Card -->
-                    <div class="ref-surface rounded p-4 border-l-4 border-l-cyan-500 relative overflow-hidden">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-bold text-cyan-400 tracking-widest uppercase">QML SETUP</span>
-                            <span class="text-[10px] text-cyan-300 font-semibold px-2 py-0.5 rounded bg-cyan-500/10">Quasimodo Level</span>
-                        </div>
-                        <div class="space-y-2 text-xs font-mono">
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total Trades</span>
-                                <span id="lt-qml-count" class="font-bold text-[var(--text)]">0</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Win Rate</span>
-                                <span id="lt-qml-wr" class="font-bold text-[var(--text)]">0%</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total PnL</span>
-                                <span id="lt-qml-pnl" class="font-bold text-emerald-500">$0.00</span>
-                            </div>
-                            <div class="flex justify-between py-1">
-                                <span class="ref-text-muted">Total R</span>
-                                <span id="lt-qml-r" class="font-bold text-cyan-400">0 R</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- LQS Card -->
-                    <div class="ref-surface rounded p-4 border-l-4 border-l-amber-500 relative overflow-hidden">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs font-bold text-amber-500 tracking-widest uppercase">LQS SETUP</span>
-                            <span class="text-[10px] text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10">Liquidity Sweep</span>
-                        </div>
-                        <div class="space-y-2 text-xs font-mono">
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total Trades</span>
-                                <span id="lt-lqs-count" class="font-bold text-[var(--text)]">0</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Win Rate</span>
-                                <span id="lt-lqs-wr" class="font-bold text-[var(--text)]">0%</span>
-                            </div>
-                            <div class="flex justify-between border-b ref-border py-1">
-                                <span class="ref-text-muted">Total PnL</span>
-                                <span id="lt-lqs-pnl" class="font-bold text-emerald-500">$0.00</span>
-                            </div>
-                            <div class="flex justify-between py-1">
-                                <span class="ref-text-muted">Total R</span>
-                                <span id="lt-lqs-r" class="font-bold text-amber-500">0 R</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lifetime Comparative Radar Chart -->
-                <div class="ref-surface p-4 rounded">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text)] mb-3">Lifetime Setup Efficiency Radar</h3>
-                    <div class="h-64 relative w-full flex justify-center">
-                        <canvas id="lifetimeRadarChart"></canvas>
-                    </div>
-                </div>
-            </section>
-
-        </main>
+<!doctype html>
+<html lang="en"><head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20261007-04-b4189fb","C":{"Abril Fatface":"YACgEZbkUVE,0","Alfa Slab One":"YACgEYS9sJU,0","Anton":"YACgEcYqQ-A,0","Archivo Black":"YACgEZulLoA,0","Archivo":"YAHO2-t-jNE,0","Arial":"YAGyDvJ_4Ts,0","Baloo 2":"YAHO2IcQUcM,0","Barlow Condensed":"YAFdJljEuFc,0","Bebas Neue":"YACgESME5ew,0","Bricolage Grotesque":"YAFyMcdwzpc,0","Canva Sans":"YAFdJjTk5UU,1","Caveat":"YALBs2ploWQ,0","Cinzel":"YACgEeV8bIQ,0","Cormorant Garamond":"YAFdJhX-538,0","Courier New":"YAGzXiGs0_8,0","Courier Prime":"YAD1aFjegN8,0","DM Sans":"YAD1aU3sLnI,0","DM Serif Display":"YAD1aYG82rc,0","Figtree":"YAHO2b-mV7A,0","Forum":"YACgEcnnqB4,0","Fraunces":"YAFdJpU7Kkk,0","Fredoka":"YACgEZml080,0","Georgia":"YAGzXkO0pEM,0","Hanken Grotesk":"YAHO2VB9G0I,0","Helvetica":"YAFcf7zkXN0,0","IBM Plex Mono":"YAFdJkmvhGI,0","IBM Plex Sans":"YAFdJgT0SHI,0","Impact":"YAFcfnjI7Vk,0","Instrument Serif":"YAHFeOnZNEk,0","Inter":"YAFdJvSyp_k,3","Italiana":"YAHO2Toik_w,0","Jacques Francois":"YAHO2a5g66Q,0","JetBrains Mono":"YAFdJksXcAk,0","Josefin Sans":"YAFdJjvw9Ps,0","Karla":"YAHO2V2NSXM,0","Lato":"YAFdJuFCnaw,0","Libre Baskerville":"YACgEUFdPdA,0","Lobster":"YAD8SnSjSFI,0","Lora":"YACgEXvxf8Q,0","Manrope":"YAHO2b2feC4,0","Merriweather":"YACgEXvHxxs,0","Montserrat":"YAFdtQi73Xs,0","Noto Sans JP":"YAFdJiHXlcI,0","Noto Sans KR":"YAGsojZj-RQ,0","Nunito Sans":"YAFdtQJYB9w,1","Nunito":"YAFdJoNRMmU,1","Oleo Script":"YACgEQQ14jI,0","Oswald":"YACgEQY10lw,0","Outfit":"YAHO2nVlg14,0","Pacifico":"YADLjORQ1u4,0","Playfair Display":"YAFdJhem5V8,1","Plus Jakarta Sans":"YAHO2gdhi18,0","Poppins":"YAFdJjbTu24,1","Press Start 2P":"YAFyGr-8pmQ,0","Quicksand":"YAFdJpYtCxE,1","Raleway":"YAFdJhmxbVQ,1","Roboto Slab":"YAFdJswIKAg,0","Rockwell":"YAFcfyVZnN0,0","Rye":"YACgEdQP21k,0","Sarabun":"YAFdJssSnME,0","Segoe UI":"YAHNdRD1Klw,0","Source Sans 3":"YAG4lO1Mj10,0","Space Grotesk":"YAHO2sjPCSM,0","Space Mono":"YADW1-vpsoc,0","Spectral":"YAHO2rVUHIM,0","Times New Roman":"YAGzXW3gftg,0","Trebuchet MS":"YAFcfrglpVA,0","Ubuntu":"YACgERDU--Q,0","Verdana":"YAGzXTctYtQ,0","Work Sans":"YAGXhLOKv44,0","Yellowtail":"YACgEYG4kG4,0"}}');</script><script src="/_sdk/6542d56fbfe7a3eb.telemetry_sdk.js" integrity="sha512-ECdM0nK7EkwDuOqho2qxgyRQXyBHk9hZqRKMBr+Xsu6zjeHlt+qkO2N2YRiHN7Kg4e1fEHDhjIp4bGJYVypv1g=="></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Avengers Traders</title>
+  <link id="appFavicon" rel="icon" type="image/png">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+:root{color-scheme:light;--navy:#182b3c;--muted:#617283;--line:#e3e9eb;--teal:#087e79;--sky:#2383ae;--indigo:#485bb0;--coral:#be5260;--amber:#a16c19}
+*{box-sizing:border-box}html,body{width:100%;margin:0}body{font-family:"DM Sans",sans-serif;color:var(--navy);background:#f8faf9}button{cursor:pointer;transition:transform .2s,background .2s,box-shadow .2s,color .2s}button:hover{filter:brightness(.97)}button:active{transform:scale(.97)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #18a5a1;outline-offset:2px}.font-mono{font-family:"Space Mono",monospace}
+.app-shell{width:100%;min-height:calc(100 * min(var(--vh, 1vh), 1vh));display:flex;flex-direction:column;background:radial-gradient(ellipse at 82% -25%,#e5f3f0 0,transparent 48%),#f8faf9}
+.site-header{background:#ffffffed;border-bottom:1px solid var(--line);backdrop-filter:blur(16px)}
+.site-header-inner{width:100%;padding:12px clamp(16px,2vw,36px);display:flex;align-items:center;justify-content:space-between;gap:14px}
+.toolbar{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px}.nav-strip{display:flex;gap:3px;padding:4px;background:#f1f5f5;border:1px solid var(--line);border-radius:12px}.nav-tab{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:9px;font-size:12px;font-weight:700;white-space:nowrap}.journal-nav-active{background:white;color:var(--teal);box-shadow:0 2px 10px #1b495019}.journal-nav-inactive{color:var(--muted)}.journal-nav-inactive:hover{background:#e7eeee}.action{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border-radius:9px;font-size:12px;font-weight:700;white-space:nowrap}.wp-button-primary{background:#087e79;color:white;border:1px solid #087e79}.wp-button-secondary{background:white;color:#28475b;border:1px solid #d4dfe2}.wp-input{width:100%;min-width:0;padding:8px 10px;border:1px solid #b7c5cc;border-radius:9px;background:white;color:var(--navy)}.wp-input:disabled{background:#f0f3f4;color:#687985}.wp-box{background:white;border:1px solid var(--line);border-radius:17px;box-shadow:0 8px 28px #193e4a09}
+.app-main{width:100%;flex:1;min-height:0;padding:clamp(14px,1.6vw,26px) clamp(14px,2vw,36px)}.view-enter:not(.hidden){animation:viewIn .32s ease both}@keyframes viewIn{from{opacity:.35;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}.dashboard{min-height:100%;display:flex;flex-direction:column;gap:clamp(12px,1.2vw,20px)}.dashboard-top{display:grid;grid-template-columns:minmax(235px,1.55fr) repeat(5,minmax(125px,1fr));gap:clamp(9px,1vw,16px)}.metric{padding:clamp(15px,1.4vw,24px);min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:10px;position:relative;overflow:hidden;animation:viewIn .45s both}.metric:nth-child(2){animation-delay:.04s}.metric:nth-child(3){animation-delay:.08s}.metric:nth-child(4){animation-delay:.12s}.metric:nth-child(5){animation-delay:.16s}.metric:nth-child(6){animation-delay:.2s}.metric:before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:var(--accent,var(--sky))}.metric-primary{background:linear-gradient(145deg,#fff 38%,#eef8f6);--accent:#087e79}.metric-value{font-size:clamp(17px,1.55vw,27px);font-weight:700;letter-spacing:-.065em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric-primary .metric-value{font-size:clamp(24px,2.35vw,39px)}.metric-foot{border-top:1px solid var(--line);padding-top:9px;font-size:11px;color:var(--muted)}.metric-heading{font-size:11px;font-weight:700;letter-spacing:.045em;text-transform:uppercase;color:var(--muted)}
+.dashboard-charts{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(290px,.85fr);gap:clamp(12px,1.2vw,20px);flex:1;min-height:360px}.chart-panel{min-width:0;padding:clamp(17px,1.55vw,26px);display:flex;flex-direction:column;min-height:350px;animation:viewIn .55s .14s both}.chart-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}.chart-area{position:relative;flex:1;min-height:245px;width:100%}.chart-footer{border-top:1px solid var(--line);padding-top:12px;margin-top:12px;color:var(--muted);font-size:12px}.dashboard .wp-box{transition:transform .22s,box-shadow .22s}.dashboard .wp-box:hover{transform:translateY(-3px);box-shadow:0 16px 34px #193e4a13}
+.view-page{height:100%;min-height:0;display:flex;flex-direction:column;gap:16px}.ledger-panel{flex:1;min-height:350px;display:flex;flex-direction:column;overflow:hidden}th{text-align:left;background:#f3f7f7;color:#31475a;border-bottom:1px solid var(--line);font-weight:700;white-space:nowrap}td{border-bottom:1px solid var(--line)}tbody tr:hover{background:#f7fbfa}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.calendar-cell{min-height:88px;padding:8px;border:1px solid var(--line);border-radius:11px;background:white;text-align:left;display:flex;flex-direction:column;gap:4px;overflow:hidden}.calendar-cell:hover{border-color:#75bbb3;background:#f3faf8}.calendar-cell.selected{border:2px solid var(--teal);background:#eaf7f4}.calendar-cell.today .day-number{background:#e1eafa;color:var(--indigo)}.calendar-cell.outside{background:#f6f8f8;color:#788995}.day-number{font-size:12px;font-weight:800;width:24px;height:24px;display:grid;place-items:center;border-radius:7px}.cal-count,.cal-pnl{font-size:10px;font-weight:700;line-height:1.3}.cal-count{color:var(--teal)}.cal-withdraw{color:var(--amber)}.positive{color:var(--teal)}.negative{color:var(--coral)}.day-activity{border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:11px;background:white}.day-activity.withdrawal{border-left-color:var(--amber)}
+[id$="Modal"]:not(.hidden){animation:modalIn .2s ease both}[id$="Modal"]>.wp-box{max-height:calc(100 * min(var(--vh, 1vh), 1vh) - 32px);overflow-y:auto}@keyframes modalIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.animate-toast{animation:viewIn .2s ease both}
+@media(min-width:1100px){.app-main{display:flex;flex-direction:column}.dashboard{flex:1}.dashboard-charts{min-height:0}.chart-panel{min-height:0}}
+@media(max-width:1200px){.dashboard-top{grid-template-columns:repeat(3,minmax(0,1fr))}.metric-primary{grid-column:span 1}.dashboard-charts{min-height:420px}}@media(max-width:780px){.site-header-inner{align-items:flex-start;flex-direction:column}.toolbar{justify-content:flex-start;width:100%}.dashboard-charts{grid-template-columns:1fr}.chart-panel{min-height:340px}.view-page{height:auto}}@media(max-width:560px){.dashboard-top{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-primary{grid-column:span 2}.toolbar{gap:6px}.nav-strip{width:100%;justify-content:space-around}.nav-tab{padding:8px 5px;font-size:11px}.action{padding:8px 9px}.calendar-grid{gap:3px}.calendar-cell{min-height:69px;padding:4px;gap:2px}.cal-count,.cal-pnl{font-size:9px}.day-number{width:20px;height:20px}[id$="Modal"]{align-items:flex-start!important;overflow-y:auto}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+</style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.577.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="/_sdk/6c2ecc939521f244.data_sdk.js" type="text/javascript" integrity="sha512-gRx8s+XsZDN6mSIQu2sivLZysbV0WHhb5kXNUWlgVb5lCMU1foJYukyMEDPv8Tnoocb8iwqB4XdRrWc7oEGzIQ=="></script>
+  <script src="/_sdk/076b13200873adb1.editing_sdk.js" type="text/javascript" integrity="sha512-ZtNtm8+39bIBEM+BqVFLF2DGJcZDSJkgYAfQa13MND+siMeCmOpG2FoU1Iv6fGQyEH3Y1nIM5T9xiJG2Bq/ozw=="></script>
+  <script src="/_sdk/ab4336f91e694f96.resizing_sdk.js" type="text/javascript" integrity="sha512-cxmeUrBrNlwwLr+tEu/iwM5F3boeK4qDMoH3QjUPqJptkO5NkaDVhQvyIHIn+3EflI5/uubWzkSA78B1tCswgA=="></script>
+ </head>
+ <body data-template-id="__page-root" class="w-full antialiased" style="background: rgb(248, 250, 249);">
+  <div class="app-shell">
+   <div id="toastContainer" aria-live="polite" class="fixed top-4 right-4 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+   <header class="site-header sticky top-0 z-30">
+    <div class="site-header-inner">
+     <div class="flex items-center gap-3 min-w-0">
+      <img data-template-id="brand-logo" loading="lazy" class="canva-image w-10 h-10 rounded-xl object-cover border border-[#e3e9eb]" src="https://lh3.googleusercontent.com/d/1wmLfWy9XZp6CuvSfe3P8WOxS58FRkOHj" alt="Etherealneel trading journal logo">
+      <div class="min-w-0">
+       <h1 class="leading-tight"><span data-template-id="brand-title" class="canva-text font-bold" style="color: rgb(24, 43, 60); font-weight: 700; font-style: normal; font-size: 18px;">The Avengers Trading Journal</span></h1><span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"><i class="fa-solid fa-eye"></i> Read Only</span><span id="cloudStatusBadge" class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"><i class="fa-solid fa-cloud"></i> Local Mode</span>
+      </div>
+     </div>
+     <div class="toolbar">
+      <nav aria-label="Journal navigation" class="nav-strip">
+       <button type="button" id="navTabDashboard" onclick="switchView('dashboard')" aria-current="page" class="nav-tab journal-nav-active"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span data-template-id="nav-dashboard" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Dashboard</span></button><button type="button" id="navTabTrades" onclick="switchView('trades')" class="nav-tab journal-nav-inactive"><i class="fa-solid fa-list-check" aria-hidden="true"></i><span data-template-id="nav-trades" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Trade Logs</span></button><button type="button" id="navTabCalendar" onclick="switchView('calendar')" class="nav-tab journal-nav-inactive"><i data-lucide="calendar-days" class="w-3.5 h-3.5" aria-hidden="true"></i><span data-template-id="nav-calendar" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Calendar</span></button>
+      </nav><button type="button" onclick="manualSyncCloud()" title="Sync with Cloud" class="action wp-button-secondary"><i id="cloudSyncBtnIcon" class="fa-solid fa-rotate"></i><span data-template-id="sync-button" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Sync Sheet</span></button><button type="button" onclick="openSettingsModal()" class="action wp-button-secondary"><i class="fa-solid fa-sliders"></i><span data-template-id="settings-button" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Settings</span></button><button type="button" onclick="openWithdrawModal()" class="action wp-button-secondary"><i class="fa-solid fa-arrow-up-from-bracket"></i><span data-template-id="withdraw-button" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Withdraw</span></button><button type="button" onclick="openTradeModal()" class="action wp-button-primary"><i class="fa-solid fa-plus"></i><span data-template-id="log-button" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Log Trade</span></button>
+     </div>
     </div>
+   </header>
+   <main class="app-main">
+    <div id="viewDashboard" class="dashboard view-enter">
+     <div class="dashboard-top">
+      <section data-template-id="equity-card" class="canva-card wp-box metric metric-primary" style="background: linear-gradient(145deg, rgb(255, 255, 255) 38%, rgb(238, 248, 246));">
+       <div class="flex justify-between items-center">
+        <span data-template-id="equity-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Equity</span><button type="button" onclick="promptEditBalance()" title="Edit Starting Balance" aria-label="Edit Starting Balance" class="text-[#087e79] p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+       </div>
+       <div id="statEquity" class="metric-value font-mono">
+        $1,000.00
+       </div>
+       <div class="metric-foot">
+        <span data-template-id="initial-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Initial:</span> <strong id="statStartBalance">$1,000.00</strong>
+       </div>
+      </section>
+      <section data-template-id="pnl-card" class="canva-card wp-box metric" style="--accent: #2383ae; background: rgb(255, 255, 255);">
+       <span data-template-id="pnl-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Net P&amp;L</span>
+       <div id="statNetProfitSub" class="metric-value font-mono">
+        $0.00
+       </div>
+       <div class="metric-foot">
+        <span data-template-id="return-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Return:</span> <strong id="statReturnBadge">+0.00%</strong>
+       </div>
+      </section>
+      <section data-template-id="withdrawals-card" class="canva-card wp-box metric" style="--accent: #a16c19; background: rgb(255, 255, 255);">
+       <div class="flex justify-between items-center">
+        <span data-template-id="withdrawals-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Withdrawals</span><button type="button" onclick="openWithdrawModal()" title="New withdrawal" aria-label="New withdrawal" class="text-[#a16c19] p-1"><i class="fa-solid fa-plus"></i></button>
+       </div>
+       <div id="statTotalWithdrawals" class="metric-value font-mono text-[#a16c19]">
+        $0.00
+       </div><button type="button" id="statWithdrawalCount" onclick="openWithdrawListModal()" class="metric-foot text-left hover:text-[#087e79]">0 Withdrawals</button>
+      </section>
+      <section data-template-id="win-card" class="canva-card wp-box metric" style="--accent: #087e79; background: rgb(255, 255, 255);">
+       <span data-template-id="win-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Win Rate</span>
+       <div id="statWinRate" class="metric-value font-mono text-[#087e79]">
+        0.0%
+       </div>
+       <div id="statWinLossRatio" class="metric-foot">
+        0 W / 0 L
+       </div>
+      </section>
+      <section data-template-id="factor-card" class="canva-card wp-box metric" style="--accent: #485bb0; background: rgb(255, 255, 255);">
+       <span data-template-id="factor-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Profit Factor</span>
+       <div id="statProfitFactor" class="metric-value font-mono">
+        0.00
+       </div>
+       <div id="statExpectancy" class="metric-foot">
+        Exp: $0.00
+       </div>
+      </section>
+      <section data-template-id="trades-card" class="canva-card wp-box metric" style="--accent: #be5260; background: rgb(255, 255, 255);">
+       <span data-template-id="trades-label" class="canva-text metric-heading" style="color: rgb(97, 114, 131); font-weight: 700; font-style: normal; font-size: 14px;">Total Trades</span>
+       <div id="statTotalTrades" class="metric-value font-mono">
+        0
+       </div>
+       <div id="statBECount" class="metric-foot">
+        0 Break-even
+       </div>
+      </section>
+     </div>
+     <div class="dashboard-charts">
+      <section data-template-id="equity-chart-card" class="canva-card wp-box chart-panel" style="background: rgb(255, 255, 255);">
+       <div class="chart-heading">
+        <h2 class="font-bold flex items-center gap-2"><i class="fa-solid fa-chart-line text-[#2383ae]"></i><span data-template-id="equity-chart-title" class="canva-text" style="color: rgb(24, 43, 60); font-weight: 700; font-style: normal; font-size: 14px;">Equity Growth Curve</span></h2>
+        <div class="flex items-center gap-1 text-xs">
+         <button type="button" id="btnChartModeEquity" onclick="setEquityChartMode('equity')" data-template-id="equity-mode" class="canva-button px-3 py-1.5 rounded-lg bg-[#087e79] text-white font-bold" style="font-weight: 400; font-style: normal; font-size: 14px;">Account Equity</button><button type="button" id="btnChartModePnL" onclick="setEquityChartMode('pnl')" data-template-id="pnl-mode" class="canva-button px-3 py-1.5 rounded-lg bg-[#f1f6f7] text-[#243b4a] border border-[#e3e9eb]" style="font-weight: 400; font-style: normal; font-size: 14px;">Trading P&amp;L</button>
+        </div>
+       </div>
+       <div class="chart-area">
+        <canvas id="equityChart"></canvas>
+       </div>
+       <div class="chart-footer flex gap-5 flex-wrap">
+        <span><span data-template-id="peak-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Peak:</span> <strong id="statPeakEquity" class="text-[#182b3c]">$1,000.00</strong></span><span><span data-template-id="drawdown-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Max Drawdown:</span> <strong id="statMaxDDVal" class="text-[#be5260]">0.00%</strong></span>
+       </div>
+      </section>
+      <section data-template-id="strategy-chart-card" class="canva-card wp-box chart-panel" style="background: rgb(255, 255, 255);">
+       <div class="chart-heading">
+        <h2 class="font-bold flex items-center gap-2"><i class="fa-solid fa-chart-pie text-[#485bb0]"></i><span data-template-id="strategy-chart-title" class="canva-text" style="color: rgb(24, 43, 60); font-weight: 700; font-style: normal; font-size: 14px;">Setup Models</span></h2>
+       </div>
+       <div class="chart-area">
+        <canvas id="strategyChart"></canvas>
+       </div>
+       <div class="chart-footer text-center">
+        <span data-template-id="top-model-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Top Model:</span> <strong id="statTopStrategy" class="text-[#087e79]">-</strong>
+       </div>
+      </section>
+     </div>
+    </div>
+    <div id="viewAllTrades" class="view-page view-enter hidden">
+     <div class="flex items-center gap-3 flex-wrap">
+      <button type="button" onclick="switchView('dashboard')" class="action wp-button-secondary"><i class="fa-solid fa-arrow-left"></i><span data-template-id="back-dashboard" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Dashboard</span></button>
+      <div>
+       <h2 data-template-id="ledger-title" class="canva-text font-bold" style="color: rgb(24, 43, 60); font-weight: 700; font-style: normal; font-size: 21px;">Trading Executions Log</h2>
+       <p data-template-id="ledger-description" class="canva-text text-xs text-[#617283]" style="color: rgb(97, 114, 131); font-weight: 400; font-style: normal; font-size: 14px;">Read-only historical ledger of all trade executions. No records can be added, edited, or deleted.</p>
+      </div>
+     </div>
+     <section class="wp-box ledger-panel">
+      <div class="p-4 border-b border-[#e3e9eb] bg-[#f6f9f8] flex flex-wrap items-center justify-between gap-3">
+       <div class="flex gap-2 items-center text-xs">
+        <i class="fa-solid fa-filter text-[#087e79]"></i><span data-template-id="filter-title" class="canva-text font-bold" style="font-weight: 700; font-style: normal; font-size: 14px;">Search &amp; Filter Logs · Read Only</span>
+       </div>
+       <div class="flex flex-wrap items-center gap-2 text-xs">
+        <label class="sr-only" for="filterSearch">Search trades</label><input id="filterSearch" type="text" oninput="handleFilterChange()" data-template-id="filter-search" class="canva-input wp-input !w-40" placeholder="Search pair, note..." style="font-weight: 400; font-style: normal; font-size: 14px;"><label class="sr-only" for="filterStrategy">Filter setup</label><select id="filterStrategy" onchange="handleFilterChange()" class="wp-input !w-auto"><option value="ALL">All Setups</option><option>TJL 1</option><option>TJL 2</option><option>QML</option><option>SBR</option><option>RBS</option><option>CRT</option><option>LIQUIDITY SWEEP</option><option>SUPPLY &amp; DEMAND</option></select><label class="sr-only" for="filterSession">Filter session</label><select id="filterSession" onchange="handleFilterChange()" class="wp-input !w-auto"><option value="ALL">All Sessions</option><option>Asian</option><option>London</option><option>New York</option></select><label class="sr-only" for="filterDirection">Filter direction</label><select id="filterDirection" onchange="handleFilterChange()" class="wp-input !w-auto"><option value="ALL">All Directions</option><option>BUY</option><option>SELL</option></select><label class="sr-only" for="filterOutcome">Filter outcome</label><select id="filterOutcome" onchange="handleFilterChange()" class="wp-input !w-auto"><option value="ALL">All Outcomes</option><option>Win</option><option>Loss</option></select>
+       </div>
+      </div>
+      <div class="overflow-auto flex-1 min-h-[280px]">
+       <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+        <thead class="sticky top-0 z-10">
+         <tr>
+          <th class="py-3 px-3">Date / Time</th>
+          <th class="py-3 px-3">Pair</th>
+          <th class="py-3 px-3">Side</th>
+          <th class="py-3 px-3">Session</th>
+          <th class="py-3 px-3">Setup Model</th>
+          <th class="py-3 px-3">Entry / SL / TP</th>
+          <th class="py-3 px-3">Planned R:R</th>
+          <th class="py-3 px-3">Risk</th>
+          <th class="py-3 px-3">Comm.</th>
+          <th class="py-3 px-3">Net P&amp;L</th>
+          <th class="py-3 px-3 text-center">Chart</th>
+          <th class="py-3 px-3 text-right readonly-hidden">Actions</th>
+         </tr>
+        </thead>
+        <tbody id="allTradesTableBody" class="font-mono"></tbody>
+       </table>
+       <div id="emptyFullTableState" class="p-12 text-center hidden">
+        <i class="fa-solid fa-folder-open text-3xl mb-2 text-[#8c9fa8]"></i>
+        <p data-template-id="empty-title" class="canva-text font-bold" style="font-weight: 700; font-style: normal; font-size: 14px;">No Trade Logs Found</p>
+        <p data-template-id="empty-description" class="canva-text text-xs text-[#617283] mt-1" style="font-weight: 400; font-style: normal; font-size: 14px;">Try resetting the filters to find existing records.</p>
+       </div>
+      </div>
+      <div class="p-3 border-t border-[#e3e9eb] bg-[#f6f9f8] flex justify-between flex-wrap gap-2 text-xs">
+       <div id="paginationInfo" class="text-[#617283] font-mono">
+        Total: 0 trades logged
+       </div><span data-template-id="scroll-hint" class="canva-text text-[#617283]" style="font-weight: 400; font-style: normal; font-size: 14px;">Scroll table to view all records</span>
+      </div>
+     </section>
+    </div>
+    <div id="viewCalendar" class="view-page view-enter hidden">
+     <div class="flex justify-between items-end flex-wrap gap-3">
+      <div>
+       <p data-template-id="calendar-eyebrow" class="canva-text text-xs font-bold uppercase tracking-[.16em] text-[#087e79]" style="color: rgb(8, 126, 121); font-weight: 700; font-style: normal; font-size: 14px;">Journal timeline</p>
+       <h2 data-template-id="calendar-title" class="canva-text font-bold" style="color: rgb(24, 43, 60); font-weight: 700; font-style: normal; font-size: 25px;">Trading Calendar</h2>
+       <p data-template-id="calendar-description" class="canva-text text-sm text-[#617283]" style="color: rgb(97, 114, 131); font-weight: 400; font-style: normal; font-size: 14px;">Explore trades and withdrawals day by day.</p>
+      </div>
+      <div class="flex gap-3 items-center text-xs">
+       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#087e79]"></span><span data-template-id="calendar-trade-legend" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Trades</span></span><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#a16c19]"></span><span data-template-id="calendar-withdraw-legend" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Withdrawals</span></span>
+      </div>
+     </div>
+     <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,.8fr)] gap-4 items-start">
+      <section data-template-id="calendar-card" class="canva-card wp-box p-3 sm:p-5" style="background: rgb(255, 255, 255);">
+       <div class="flex justify-between items-center mb-4 gap-2">
+        <div>
+         <h3 id="calendarMonthHeading" class="font-bold text-lg" aria-live="polite"></h3>
+         <p data-template-id="calendar-month-hint" class="canva-text text-xs text-[#617283]" style="color: rgb(97, 114, 131); font-weight: 400; font-style: normal; font-size: 14px;">Select a date to inspect its activity.</p>
+        </div>
+        <div class="flex gap-2">
+         <button type="button" onclick="changeCalendarMonth(-1)" aria-label="Previous month" class="wp-button-secondary rounded-lg w-9 h-9 grid place-items-center"><i data-lucide="chevron-left" class="w-4 h-4"></i></button><button type="button" onclick="changeCalendarMonth(1)" aria-label="Next month" class="wp-button-secondary rounded-lg w-9 h-9 grid place-items-center"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+        </div>
+       </div>
+       <div class="calendar-grid mb-2 text-center text-[11px] uppercase font-bold text-[#617283]" aria-hidden="true">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+       </div>
+       <div id="calendarGrid" class="calendar-grid" aria-label="Trading activity calendar"></div>
+      </section>
+      <aside data-template-id="calendar-detail-card" class="canva-panel wp-box p-4 sm:p-5 xl:sticky xl:top-24" style="background: rgb(255, 255, 255);">
+       <p data-template-id="calendar-detail-eyebrow" class="canva-text text-xs font-bold uppercase tracking-[.15em] text-[#087e79]" style="color: rgb(8, 126, 121); font-weight: 700; font-style: normal; font-size: 14px;">Selected day</p>
+       <h3 id="calendarSelectedHeading" class="font-bold text-lg mt-1" aria-live="polite"></h3>
+       <p id="calendarDaySummary" class="text-sm text-[#617283] mt-1"></p>
+       <div id="calendarDayEvents" class="space-y-2 mt-4" aria-live="polite"></div>
+      </aside>
+     </div>
+    </div>
+   </main>
+  </div>
+  <div id="tradeModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-xl overflow-hidden">
+    <div class="px-5 py-3 border-b border-[#e3e9eb] bg-[#f6f9f8] flex justify-between items-center">
+     <h3 id="modalTitle" class="font-bold">Log Trade Execution</h3><button type="button" onclick="closeTradeModal()" aria-label="Close trade form"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="tradeForm" onsubmit="handleTradeSubmit(event)" class="p-5 space-y-4 text-xs">
+     <input type="hidden" id="tradeId">
+     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+       <label for="tradeDateTime" data-template-id="trade-date-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Date &amp; Time</label><input type="datetime-local" id="tradeDateTime" required="" class="wp-input">
+      </div>
+      <div>
+       <label for="tradePair" data-template-id="trade-pair-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Pair</label><select id="tradePair" required="" class="wp-input"><option>XAU/USD</option><option>BTC/USD</option><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>USD/CHF</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option></select>
+      </div>
+      <div>
+       <label for="tradeSession" data-template-id="trade-session-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Session</label><select id="tradeSession" required="" class="wp-input"><option>London</option><option>New York</option><option>Asian</option></select>
+      </div>
+     </div>
+     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+       <label for="tradeDirection" data-template-id="direction-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Direction</label><select id="tradeDirection" required="" class="wp-input"><option>BUY</option><option>SELL</option></select>
+      </div>
+      <div>
+       <label for="tradeStrategy" data-template-id="setup-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Setup Model</label><select id="tradeStrategy" required="" class="wp-input"><option>TJL 1</option><option>TJL 2</option><option>QML</option><option>SBR</option><option>RBS</option><option>CRT</option><option>LIQUIDITY SWEEP</option><option>SUPPLY &amp; DEMAND</option></select>
+      </div>
+      <div>
+       <label for="tradeOutcome" data-template-id="outcome-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Outcome</label><select id="tradeOutcome" required="" onchange="calcFormMetrics()" class="wp-input"><option>Win</option><option>Loss</option></select>
+      </div>
+     </div>
+     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-[#f6f9f8] p-3 border border-[#e3e9eb] rounded-xl">
+      <div>
+       <label for="tradeEntry" data-template-id="entry-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Entry Price</label><input type="number" step="any" id="tradeEntry" oninput="calcFormMetrics()" placeholder="1.0850" class="wp-input font-mono">
+      </div>
+      <div>
+       <label for="tradeSL" data-template-id="sl-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Stop Loss</label><input type="number" step="any" id="tradeSL" oninput="calcFormMetrics()" placeholder="1.0830" class="wp-input font-mono">
+      </div>
+      <div>
+       <label for="tradeTP" data-template-id="tp-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Target (TP)</label><input type="number" step="any" id="tradeTP" oninput="calcFormMetrics()" placeholder="1.0910" class="wp-input font-mono">
+      </div>
+      <div>
+       <label for="tradeRisk" data-template-id="risk-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Risk ($)</label><input type="number" step="any" id="tradeRisk" oninput="calcFormMetrics()" placeholder="100" class="wp-input font-mono">
+      </div>
+      <div>
+       <label for="tradeCommission" data-template-id="commission-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Comm. ($)</label><input type="number" step="any" id="tradeCommission" oninput="calcFormMetrics()" placeholder="0.00" value="0" class="wp-input font-mono">
+      </div>
+     </div>
+     <div class="bg-[#edf7f8] border border-[#d3e9ed] p-3 rounded-xl text-center grid grid-cols-2 gap-2">
+      <div>
+       <div data-template-id="rr-label" class="canva-text font-bold text-[#617283]" style="font-weight: 700; font-style: normal; font-size: 14px;">Planned R:R</div>
+       <div id="previewRR" class="text-base font-bold font-mono text-[#2383ae]">
+        1 : 0.00
+       </div>
+      </div>
+      <div>
+       <div data-template-id="estimated-label" class="canva-text font-bold text-[#617283]" style="font-weight: 700; font-style: normal; font-size: 14px;">Estimated Net P&amp;L</div>
+       <div id="previewPnL" class="text-base font-bold font-mono text-[#087e79]">
+        $0.00
+       </div>
+      </div>
+     </div>
+     <div>
+      <label for="tradeNotes" data-template-id="notes-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Execution Notes</label><textarea id="tradeNotes" rows="2" placeholder="Market structure, setup confluence..." class="wp-input"></textarea>
+     </div>
+     <div>
+      <label for="tradeChartUrl" data-template-id="screenshot-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Chart Screenshot Link / File</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+       <input type="url" id="tradeChartUrl" placeholder="https://www.tradingview.com/x/..." class="wp-input"><label class="sr-only" for="tradeChartFile">Upload chart screenshot</label><input type="file" id="tradeChartFile" accept="image/*" onchange="handleImageFileUpload(event)" class="text-xs text-[#617283]">
+      </div><input type="hidden" id="tradeChartDataUrl">
+     </div>
+     <div class="pt-2 border-t border-[#e3e9eb] flex justify-end gap-2">
+      <button type="button" onclick="closeTradeModal()" data-template-id="trade-cancel" class="canva-button action wp-button-secondary" style="font-weight: 400; font-style: normal; font-size: 14px;">Cancel</button><button type="submit" data-template-id="trade-save" class="canva-button action wp-button-primary" style="font-weight: 400; font-style: normal; font-size: 14px;">Save Trade</button>
+     </div>
+    </form>
+   </div>
+  </div>
+  <div id="withdrawModal" role="dialog" aria-modal="true" aria-labelledby="withdrawModalTitle" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-[#e3e9eb] bg-[#f6f9f8] flex justify-between">
+     <h3 id="withdrawModalTitle" class="font-bold">Record Withdrawal</h3><button type="button" onclick="closeWithdrawModal()" aria-label="Close withdrawal form"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form onsubmit="handleWithdrawSubmit(event)" class="p-5 space-y-3 text-xs">
+     <input type="hidden" id="withdrawId">
+     <div>
+      <label for="withdrawDateTime" data-template-id="withdraw-date-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Date &amp; Time</label><input type="datetime-local" id="withdrawDateTime" required="" class="wp-input">
+     </div>
+     <div>
+      <label for="withdrawAmount" data-template-id="amount-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Amount ($)</label><input type="number" step="any" min="0.01" id="withdrawAmount" placeholder="e.g. 500.00" required="" class="wp-input font-mono">
+     </div>
+     <div>
+      <label for="withdrawNote" data-template-id="payout-note-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Payout Note (Optional)</label><input type="text" id="withdrawNote" placeholder="e.g. Bank wire" class="wp-input">
+     </div>
+     <div class="pt-2 border-t border-[#e3e9eb] flex justify-end gap-2">
+      <button type="button" onclick="closeWithdrawModal()" data-template-id="withdraw-cancel" class="canva-button action wp-button-secondary" style="font-weight: 400; font-style: normal; font-size: 14px;">Cancel</button><button type="submit" data-template-id="withdraw-save" class="canva-button action wp-button-primary" style="font-weight: 400; font-style: normal; font-size: 14px;">Record Payout</button>
+     </div>
+    </form>
+   </div>
+  </div>
+  <div id="withdrawListModal" role="dialog" aria-modal="true" aria-label="Withdrawal Log" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-md overflow-hidden flex flex-col">
+    <div class="px-5 py-3 border-b border-[#e3e9eb] bg-[#f6f9f8] flex justify-between">
+     <h3 class="font-bold flex gap-2 items-center"><i class="fa-solid fa-arrow-up-from-bracket text-[#a16c19]"></i><span data-template-id="withdraw-log-title" class="canva-text" style="font-weight: 700; font-style: normal; font-size: 14px;">Withdrawal Log</span></h3><button type="button" onclick="closeWithdrawListModal()" aria-label="Close withdrawal log"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="withdrawListContainer" class="p-4 overflow-y-auto space-y-2 text-xs font-mono"></div>
+    <div class="p-3 border-t border-[#e3e9eb] bg-[#f6f9f8] flex justify-between text-xs">
+     <button type="button" onclick="openWithdrawModal();closeWithdrawListModal()" data-template-id="new-withdrawal" class="canva-button font-bold text-[#087e79]" style="font-weight: 400; font-style: normal; font-size: 14px;">+ New Withdrawal</button><button type="button" onclick="closeWithdrawListModal()" data-template-id="withdraw-list-close" class="canva-button action wp-button-secondary" style="font-weight: 400; font-style: normal; font-size: 14px;">Close</button>
+    </div>
+   </div>
+  </div>
+  <div id="settingsModal" role="dialog" aria-modal="true" aria-label="Journal Preferences" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-md overflow-hidden">
+    <div class="px-5 py-3 border-b border-[#e3e9eb] bg-[#f6f9f8] flex justify-between">
+     <h3 data-template-id="settings-title" class="canva-text font-bold" style="font-weight: 700; font-style: normal; font-size: 16px;">Journal Preferences</h3><button type="button" onclick="closeSettingsModal()" aria-label="Close settings"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form onsubmit="saveSettings(event)" class="p-5 space-y-3 text-xs">
+     <div>
+      <label for="settingStartBalance" data-template-id="balance-label" class="canva-text block font-bold mb-1" style="font-weight: 700; font-style: normal; font-size: 14px;">Starting Account Balance ($)</label><input type="number" step="any" id="settingStartBalance" required="" class="wp-input font-mono font-bold">
+     </div>
+     <div>
+      <div class="flex justify-between gap-2 mb-1">
+       <label for="settingCloudUrl" data-template-id="server-label" class="canva-text font-bold" style="font-weight: 700; font-style: normal; font-size: 14px;">Google Apps Script Server Link</label><span class="text-[10px] text-[#a16c19] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"><i class="fa-solid fa-lock"></i> <span data-template-id="locked-label" class="canva-text" style="font-weight: 400; font-style: normal; font-size: 14px;">Locked for Security</span></span>
+      </div><input type="url" id="settingCloudUrl" readonly="" disabled="" class="wp-input font-mono text-[11px]">
+      <p data-template-id="security-description" class="canva-text text-[11px] text-[#617283] mt-1" style="font-weight: 400; font-style: normal; font-size: 14px;">Server link editing is disabled from settings to protect system integration security.</p>
+     </div>
+     <div class="pt-2 border-t border-[#e3e9eb] flex justify-between gap-2 items-center">
+      <button type="button" onclick="pullFromCloud()" data-template-id="pull-button" class="canva-button text-[#087e79] font-bold" style="font-weight: 400; font-style: normal; font-size: 14px;">Pull from Sheet</button>
+      <div class="flex gap-2">
+       <button type="button" onclick="closeSettingsModal()" data-template-id="settings-cancel" class="canva-button action wp-button-secondary" style="font-weight: 400; font-style: normal; font-size: 14px;">Cancel</button><button type="submit" data-template-id="settings-save" class="canva-button action wp-button-primary" style="font-weight: 400; font-style: normal; font-size: 14px;">Save Settings</button>
+      </div>
+     </div>
+    </form>
+   </div>
+  </div>
+  <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-xs p-5 space-y-3 text-xs">
+    <div class="flex items-center gap-2 text-[#a16c19]">
+     <i id="confirmIcon" class="fa-solid fa-triangle-exclamation"></i>
+     <h3 id="confirmTitle" class="font-bold text-[#182b3c]">Confirmation</h3>
+    </div>
+    <p id="confirmMessage" class="text-[#617283]">Are you sure you want to proceed?</p>
+    <div id="confirmInputContainer" class="hidden">
+     <label class="sr-only" for="confirmInput">Value</label><input type="text" id="confirmInput" class="wp-input">
+    </div>
+    <div class="flex justify-end gap-2 pt-2 border-t border-[#e3e9eb]">
+     <button type="button" onclick="closeConfirmModal(false)" data-template-id="confirm-cancel" class="canva-button action wp-button-secondary" style="font-weight: 400; font-style: normal; font-size: 14px;">Cancel</button><button type="button" onclick="closeConfirmModal(true)" data-template-id="confirm-proceed" class="canva-button action bg-[#be5260] text-white" style="font-weight: 400; font-style: normal; font-size: 14px;">Proceed</button>
+    </div>
+   </div>
+  </div>
+  <div id="chartPreviewModal" role="dialog" aria-modal="true" aria-label="Chart Screenshot Inspector" class="fixed inset-0 z-50 bg-[#182b3c]/40 backdrop-blur-sm flex items-center justify-center hidden p-4">
+   <div class="wp-box w-full max-w-4xl overflow-hidden">
+    <div class="px-4 py-2.5 border-b border-[#e3e9eb] bg-[#f6f9f8] flex justify-between text-xs">
+     <span class="font-bold flex gap-2 items-center"><i class="fa-solid fa-image text-[#2383ae]"></i><span data-template-id="preview-title" class="canva-text" style="font-weight: 700; font-style: normal; font-size: 14px;">Chart Screenshot Inspector</span></span><button type="button" onclick="closeChartPreviewModal()" aria-label="Close chart preview"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="p-3 bg-[#f6f9f8] flex justify-center overflow-auto">
+     <img id="chartPreviewImage" class="max-w-full max-h-[70vh] object-contain rounded border border-[#e3e9eb]" alt="Uploaded trade chart preview">
+    </div>
+   </div>
+  </div>
 
-    <!-- GOOGLE SHEET CONFIG MODAL -->
-    <div id="sheetModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="ref-surface rounded w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div class="px-5 py-4 border-b ref-border flex justify-between items-center ref-surface-soft">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-500"></i>
-                    <h3 class="font-bold text-sm text-[var(--text)] uppercase tracking-wider">Google Sheets Backend Setup</h3>
-                </div>
-                <button id="closeSheetModalBtn" class="ref-text-muted hover:text-[var(--text)] p-1 rounded">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-5 overflow-y-auto space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Google Apps Script Web App URL</label>
-                    <input type="url" id="sheetScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                </div>
-
-                <div class="text-xs ref-surface-soft p-3.5 rounded border ref-border space-y-2">
-                    <div class="font-bold text-[var(--accent)] uppercase text-[10px] tracking-wider">How to setup Google Sheet in 2 mins:</div>
-                    <ol class="list-decimal list-inside space-y-1 text-[11px] ref-text-muted leading-relaxed">
-                        <li>Open a new <a href="https://sheets.new" target="_blank" class="underline text-[var(--accent)] font-medium">Google Sheet</a>.</li>
-                        <li>Click <b>Extensions &gt; Apps Script</b> in the Google Sheet menu.</li>
-                        <li>Replace all code in Apps Script with the template snippet below and save.</li>
-                        <li>Click <b>Deploy &gt; New deployment</b>.</li>
-                        <li>Select <b>Web App</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>.</li>
-                        <li>Copy the generated Web App URL and paste it into the field above!</li>
-                    </ol>
-                </div>
-
-                <!-- Apps Script Code Box -->
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-bold uppercase tracking-wider ref-text-muted">Google Apps Script Code Snippet</span>
-                        <button id="copyScriptBtn" class="text-[10px] text-[var(--accent)] hover:underline flex items-center gap-1 font-mono">
-                            <i data-lucide="copy" class="w-3 h-3"></i> Copy Code
-                        </button>
-                    </div>
-                    <textarea id="appsScriptCode" readonly rows="7" class="w-full ref-surface-soft border ref-border rounded p-2.5 text-[10px] font-mono text-[var(--muted)] select-all focus:outline-none">
-function doGet() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
-  var headers = data[0];
-  var result = [];
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = row[j];
-    }
-    result.push(obj);
-  }
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var body = JSON.parse(e.postData.contents);
-  var action = body.action;
-  var trade = body.trade;
-  
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["id", "date", "pair", "type", "setup", "entry", "sl", "tp", "chartUrl", "outcome", "risk", "pnl", "notes"]);
-  }
-  
-  var data = sheet.getDataRange().getValues();
-  var headers = data[0] || ["id", "date", "pair", "type", "setup", "entry", "sl", "tp", "chartUrl", "outcome", "risk", "pnl", "notes"];
-  
-  if (action === "SYNC_ALL") {
-    sheet.clearContents();
-    sheet.appendRow(headers);
-    body.trades.forEach(function(t) {
-      sheet.appendRow([t.id, t.date, t.pair, t.type, t.setup, t.entry, t.sl, t.tp, t.chartUrl, t.outcome, t.risk, t.pnl, t.notes]);
+<style id="readOnlyMode">
+/* READ-ONLY MODE */
+.readonly-hidden{display:none!important}
+</style>
+<script>
+/* This journal is intentionally view-only. Existing records can be inspected and filtered,
+   but no trade, withdrawal, balance, settings, or cloud-write action can be initiated. */
+(function(){
+  const hide = [
+    'button[onclick="manualSyncCloud()"]',
+    'button[onclick="openSettingsModal()"]',
+    'button[onclick="openWithdrawModal()"]',
+    'button[onclick="openTradeModal()"]',
+    'button[onclick="promptEditBalance()"]',
+    'button[onclick*="confirmDeleteTrade"]',
+    'button[onclick*="editTrade"]',
+    'button[onclick*="confirmDeleteWithdrawal"]',
+    'button[onclick*="openWithdrawModal("]'
+  ];
+  function applyReadOnly(){
+    hide.forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.classList.add('readonly-hidden')));
+    const actions=[...document.querySelectorAll('th')].find(th=>th.textContent.trim()==='Actions');
+    if(actions) actions.classList.add('readonly-hidden');
+    document.querySelectorAll('#allTradesTableBody tr').forEach(tr=>{
+      const cells=tr.querySelectorAll('td'); if(cells.length) cells[cells.length-1]?.classList.add('readonly-hidden');
     });
-    return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+    const newW=document.querySelector('[data-template-id="new-withdrawal"]'); if(newW) newW.classList.add('readonly-hidden');
   }
-  
-  if (action === "SAVE") {
-    var foundIndex = -1;
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(trade.id)) { foundIndex = i + 1; break; }
-    }
-    var rowData = [trade.id, trade.date, trade.pair, trade.type, trade.setup, trade.entry, trade.sl, trade.tp, trade.chartUrl, trade.outcome, trade.risk, trade.pnl, trade.notes];
-    if (foundIndex > 0) {
-      sheet.getRange(foundIndex, 1, 1, rowData.length).setValues([rowData]);
-    } else {
-      sheet.appendRow(rowData);
-    }
-  }
-  
-  if (action === "DELETE") {
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(body.id)) { sheet.deleteRow(i + 1); break; }
-    }
-  }
-  
-  return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
-}
-                    </textarea>
-                </div>
-
-                <div class="pt-2 flex justify-end gap-2 border-t ref-border">
-                    <button type="button" id="saveSheetUrlBtn" class="px-4 py-2 text-xs font-semibold btn-accent rounded shadow-sm uppercase tracking-wider">Connect Sheet Backend</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOG TRADE MODAL -->
-    <div id="tradeModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-        <div class="ref-surface rounded w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div class="px-5 py-4 border-b ref-border flex justify-between items-center ref-surface-soft">
-                <h3 id="modalTitle" class="font-bold text-sm text-[var(--text)] uppercase tracking-wider">Log Execution</h3>
-                <button id="closeModalBtn" class="ref-text-muted hover:text-[var(--text)] p-1 rounded">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <form id="tradeForm" class="p-5 overflow-y-auto space-y-4">
-                <input type="hidden" id="tradeId">
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Date</label>
-                        <input type="date" id="tradeDate" required class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Pair / Instrument</label>
-                        <input type="text" id="tradePair" placeholder="e.g. XAUUSD" required class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)] uppercase">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Direction</label>
-                        <select id="tradeType" class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                            <option value="BUY">BUY (Long)</option>
-                            <option value="SELL">SELL (Short)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Setup (Strict 3 Only)</label>
-                        <select id="tradeSetup" class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs font-bold text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                            <option value="TJL">TJL (Targeted Level)</option>
-                            <option value="QML">QML (Quasimodo Level)</option>
-                            <option value="LQS">LQS (Liquidity Sweep)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Price Levels Block -->
-                <div class="grid grid-cols-3 gap-3 ref-surface-soft p-3 rounded border ref-border">
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Entry Price</label>
-                        <input type="number" id="tradeEntry" placeholder="2650.0" step="any" class="w-full ref-surface border ref-border rounded px-2.5 py-1.5 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Stop Loss (SL)</label>
-                        <input type="number" id="tradeSl" placeholder="2640.0" step="any" class="w-full ref-surface border ref-border rounded px-2.5 py-1.5 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Take Profit (TP)</label>
-                        <input type="number" id="tradeTp" placeholder="2680.0" step="any" class="w-full ref-surface border ref-border rounded px-2.5 py-1.5 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-3">
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Outcome</label>
-                        <select id="tradeOutcome" class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                            <option value="WIN">WIN</option>
-                            <option value="LOSS">LOSS</option>
-                            <option value="BE">Break Even</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Risk Amount ($)</label>
-                        <input type="number" id="tradeRisk" placeholder="100" min="0" step="any" required class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">PnL Net ($)</label>
-                        <input type="number" id="tradePnl" placeholder="250" step="any" required class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">TradingView Link</label>
-                    <input type="url" id="tradeChartUrl" placeholder="https://www.tradingview.com/x/..." class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-[var(--accent)]">
-                </div>
-
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider ref-text-muted mb-1">Notes & Confluences</label>
-                    <textarea id="tradeNotes" rows="3" placeholder="Key triggers, session background..." class="w-full ref-surface border ref-border rounded px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)] resize-none"></textarea>
-                </div>
-
-                <div class="pt-2 flex justify-end gap-2 border-t ref-border">
-                    <button type="button" id="cancelModalBtn" class="px-4 py-2 text-xs font-semibold ref-text-muted hover:text-[var(--text)] rounded uppercase tracking-wider">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-xs font-semibold btn-accent rounded shadow-sm uppercase tracking-wider">Save Execution</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MAIN APP SCRIPT -->
-    <script>
-        // State Management
-        let trades = [];
-        let currentCalendarDate = new Date();
-        let chartInstances = {};
-        
-        // HARDCODED GOOGLE APPS SCRIPT WEB APP BACKEND URL
-        const sheetScriptUrl = 'https://script.google.com/macros/s/AKfycbxLv4xCqL3-IcyXvdPYJMdqlicPcxo9l9TovRecUAHTxE9FSBb53tVA3o1L3GrFI0Lu/exec';
-
-        // Default mock sample data fallback if sheet is completely empty
-        const defaultTrades = [
-            { id: '1', date: '2026-10-02', pair: 'XAUUSD', type: 'BUY', setup: 'TJL', entry: 2650.0, sl: 2642.0, tp: 2674.0, chartUrl: 'https://www.tradingview.com/x/dummy1/', outcome: 'WIN', risk: 100, pnl: 300, notes: 'Targeted liquidity level tapped with precision' },
-            { id: '2', date: '2026-10-05', pair: 'XAUUSD', type: 'SELL', setup: 'QML', entry: 2685.0, sl: 2692.0, tp: 2664.0, chartUrl: 'https://www.tradingview.com/x/dummy2/', outcome: 'WIN', risk: 100, pnl: 300, notes: 'Quasimodo structural alignment with London high' }
-        ];
-
-        // Theme Toggle Handler
-        const themeToggleBtn = document.getElementById('themeToggle');
-        const rootEl = document.documentElement;
-
-        themeToggleBtn.addEventListener('click', () => {
-            const currentTheme = rootEl.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            rootEl.setAttribute('data-theme', newTheme);
-            localStorage.setItem('apex_journal_theme', newTheme);
-            refreshCurrentView();
-        });
-
-        // Load theme from storage
-        const savedTheme = localStorage.getItem('apex_journal_theme') || 'dark';
-        rootEl.setAttribute('data-theme', savedTheme);
-
-        // Helper: get current CSS variable value
-        function getCssVar(varName) {
-            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-        }
-
-        // Initialization
-        window.addEventListener('DOMContentLoaded', () => {
-            lucide.createIcons();
-            loadTrades();
-            populateYearDropdowns();
-            setupNavigation();
-            setupModalListeners();
-            setupFilterListeners();
-            setupCalendarListeners();
-            
-            // Set default tab to dashboard
-            switchPage('dashboard');
-        });
-
-        // Sync Status UI update
-        function updateSyncStatus(status, text) {
-            const dot = document.getElementById('syncDot');
-            const label = document.getElementById('syncText');
-            if (!dot || !label) return;
-
-            if (status === 'syncing') {
-                dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
-                label.textContent = text || 'Syncing Sheet...';
-            } else if (status === 'success') {
-                dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
-                label.textContent = text || 'Sheet Connected';
-            } else if (status === 'error') {
-                dot.className = 'w-2 h-2 rounded-full bg-red-400';
-                label.textContent = text || 'Sync Error';
-            }
-        }
-
-        // Sync trades from Google Sheet backend
-        async function syncFromGoogleSheet() {
-            updateSyncStatus('syncing', 'Fetching from Sheet...');
-            try {
-                const res = await fetch(sheetScriptUrl);
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    trades = data.map(item => ({
-                        id: String(item.id),
-                        date: String(item.date || ''),
-                        pair: String(item.pair || ''),
-                        type: String(item.type || 'BUY'),
-                        setup: String(item.setup || 'TJL'),
-                        entry: item.entry ? Number(item.entry) : '',
-                        sl: item.sl ? Number(item.sl) : '',
-                        tp: item.tp ? Number(item.tp) : '',
-                        chartUrl: String(item.chartUrl || ''),
-                        outcome: String(item.outcome || 'WIN'),
-                        risk: Number(item.risk || 0),
-                        pnl: Number(item.pnl || 0),
-                        notes: String(item.notes || '')
-                    }));
-                    localStorage.setItem('apex_trading_journal_trades', JSON.stringify(trades));
-                    populateYearDropdowns();
-                    refreshCurrentView();
-                    updateSyncStatus('success', 'Auto Sync Active');
-                } else if (Array.isArray(data) && data.length === 0 && trades.length > 0) {
-                    // Initial seed push to Google Sheet if empty
-                    sendToGoogleSheet('SYNC_ALL', { trades });
-                    updateSyncStatus('success', 'Auto Sync Active');
-                }
-            } catch (err) {
-                console.error("Failed to load from Google Sheet:", err);
-                updateSyncStatus('error', 'Using Offline Cache');
-            }
-        }
-
-        // Post single action or batch sync to Google Sheet
-        async function sendToGoogleSheet(action, payload) {
-            updateSyncStatus('syncing', 'Saving to Sheet...');
-            try {
-                await fetch(sheetScriptUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action, ...payload })
-                });
-                updateSyncStatus('success', 'Auto Sync Active');
-            } catch (err) {
-                console.error("Failed sending payload to Google Sheet:", err);
-                updateSyncStatus('error', 'Save Failed');
-            }
-        }
-
-        // Data Storage & Synchronization Engine
-        function loadTrades() {
-            const stored = localStorage.getItem('apex_trading_journal_trades');
-            if (stored) {
-                try { trades = JSON.parse(stored); } catch(e) { trades = [...defaultTrades]; }
-            } else {
-                trades = [...defaultTrades];
-            }
-            
-            // Sync from Google Sheet on startup
-            syncFromGoogleSheet();
-        }
-
-        function saveTrades(modifiedTrade = null, action = 'SYNC_ALL') {
-            localStorage.setItem('apex_trading_journal_trades', JSON.stringify(trades));
-            populateYearDropdowns();
-            refreshCurrentView();
-
-            if (action === 'SAVE' && modifiedTrade) {
-                sendToGoogleSheet('SAVE', { trade: modifiedTrade });
-            } else if (action === 'DELETE' && modifiedTrade) {
-                sendToGoogleSheet('DELETE', { id: modifiedTrade.id });
-            } else {
-                sendToGoogleSheet('SYNC_ALL', { trades });
-            }
-        }
-
-        // Helper: Populate dynamic year dropdowns for analytics selector
-        function populateYearDropdowns() {
-            const years = new Set(trades.map(t => t.date ? t.date.substring(0, 4) : new Date().getFullYear().toString()));
-            years.add(new Date().getFullYear().toString());
-
-            const sortedYears = Array.from(years).sort().reverse();
-            
-            const monthlyYearSelect = document.getElementById('monthly-select-year');
-            const yearlyYearSelect = document.getElementById('yearly-select-year');
-
-            monthlyYearSelect.innerHTML = '<option value="ALL">All Years</option>';
-            yearlyYearSelect.innerHTML = '<option value="ALL">All Years</option>';
-
-            sortedYears.forEach(y => {
-                monthlyYearSelect.innerHTML += `<option value="${y}">${y}</option>`;
-                yearlyYearSelect.innerHTML += `<option value="${y}">${y}</option>`;
-            });
-        }
-
-        // Data Storage & Synchronization Engine
-        function loadTrades() {
-            const stored = localStorage.getItem('apex_trading_journal_trades');
-            if (stored) {
-                try { trades = JSON.parse(stored); } catch(e) { trades = [...defaultTrades]; }
-            } else {
-                trades = [...defaultTrades];
-                saveTrades();
-            }
-
-            if (sheetScriptUrl) {
-                syncFromGoogleSheet();
-            }
-        }
-
-        function saveTrades(modifiedTrade = null, action = 'SYNC_ALL') {
-            localStorage.setItem('apex_trading_journal_trades', JSON.stringify(trades));
-            populateYearDropdowns();
-            refreshCurrentView();
-
-            if (sheetScriptUrl) {
-                if (action === 'SAVE' && modifiedTrade) {
-                    sendToGoogleSheet('SAVE', { trade: modifiedTrade });
-                } else if (action === 'DELETE' && modifiedTrade) {
-                    sendToGoogleSheet('DELETE', { id: modifiedTrade.id });
-                } else {
-                    sendToGoogleSheet('SYNC_ALL', { trades });
-                }
-            }
-        }
-
-        // Navigation Engine
-        function setupNavigation() {
-            const navButtons = document.querySelectorAll('.nav-btn');
-            navButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const page = btn.getAttribute('data-page');
-                    switchPage(page);
-                });
-            });
-        }
-
-        function switchPage(pageId) {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                if (btn.getAttribute('data-page') === pageId) {
-                    btn.classList.add('bg-[var(--surface-soft)]', 'text-[var(--accent)]', 'border', 'border-[var(--accent)]/30');
-                    btn.classList.remove('text-[var(--muted)]');
-                } else {
-                    btn.classList.remove('bg-[var(--surface-soft)]', 'text-[var(--accent)]', 'border', 'border-[var(--accent)]/30');
-                    btn.classList.add('text-[var(--muted)]');
-                }
-            });
-
-            document.querySelectorAll('.page-view').forEach(sec => sec.classList.add('hidden'));
-            const activePage = document.getElementById(`page-${pageId}`);
-            if (activePage) activePage.classList.remove('hidden');
-
-            renderPageContent(pageId);
-        }
-
-        function refreshCurrentView() {
-            const activeBtn = document.querySelector('.nav-btn.text-\\[var\\(--accent\\)\\]');
-            const pageId = activeBtn ? activeBtn.getAttribute('data-page') : 'dashboard';
-            renderPageContent(pageId);
-        }
-
-        function renderPageContent(pageId) {
-            if (pageId === 'dashboard') renderDashboard();
-            if (pageId === 'trades') renderTradesTable();
-            if (pageId === 'calendar') renderCalendar();
-            if (pageId === 'monthly') renderMonthly();
-            if (pageId === 'yearly') renderYearly();
-            if (pageId === 'lifetime') renderLifetime();
-        }
-
-        // Calculations & Metrics Helper
-        function getCalculatedMetrics(tradeList = trades) {
-            const totalTrades = tradeList.length;
-            if (totalTrades === 0) {
-                return { totalTrades: 0, winRate: 0, wins: 0, losses: 0, be: 0, netPnl: 0, totalR: 0, profitFactor: 0, expectancy: 0, avgRR: 0 };
-            }
-
-            let wins = 0, losses = 0, be = 0;
-            let netPnl = 0;
-            let totalR = 0;
-            let grossProfit = 0;
-            let grossLoss = 0;
-
-            tradeList.forEach(t => {
-                const pnl = Number(t.pnl) || 0;
-                const risk = Number(t.risk) || 1;
-                const r = risk > 0 ? (pnl / risk) : 0;
-                
-                netPnl += pnl;
-                totalR += r;
-
-                if (t.outcome === 'WIN') { wins++; grossProfit += pnl; }
-                else if (t.outcome === 'LOSS') { losses++; grossLoss += Math.abs(pnl); }
-                else { be++; }
-            });
-
-            const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : 0;
-            const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : (grossProfit > 0 ? '∞' : '0.00');
-            const expectancy = totalTrades > 0 ? (netPnl / totalTrades).toFixed(2) : 0;
-            const avgRR = totalTrades > 0 ? (totalR / totalTrades).toFixed(2) : 0;
-
-            return { totalTrades, winRate, wins, losses, be, netPnl, totalR, profitFactor, expectancy, avgRR };
-        }
-
-        // RENDER: DASHBOARD
-        function renderDashboard() {
-            const metrics = getCalculatedMetrics();
-            const accentColor = getCssVar('--accent');
-            const lineBorder = getCssVar('--line');
-            const mutedText = getCssVar('--muted');
-
-            document.getElementById('dash-net-pnl').textContent = `$${metrics.netPnl.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            document.getElementById('dash-net-pnl').className = `text-xl md:text-2xl font-bold font-mono ${metrics.netPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`;
-            document.getElementById('dash-net-r').textContent = `${metrics.totalR.toFixed(2)} R`;
-            
-            document.getElementById('dash-winrate').textContent = `${metrics.winRate}%`;
-            document.getElementById('dash-win-ratio').textContent = `${metrics.wins} W / ${metrics.losses} L / ${metrics.be} BE`;
-            
-            document.getElementById('dash-total-trades').textContent = metrics.totalTrades;
-            document.getElementById('dash-avg-rr').textContent = `Avg RR: 1:${metrics.avgRR}`;
-            
-            document.getElementById('dash-profit-factor').textContent = metrics.profitFactor;
-            document.getElementById('dash-expectancy').textContent = `$${metrics.expectancy}`;
-
-            // Render Setup Breakdown Table
-            const setupTable = document.getElementById('dash-setup-table');
-            setupTable.innerHTML = '';
-            ['TJL', 'QML', 'LQS'].forEach(setupKey => {
-                const filtered = trades.filter(t => t.setup === setupKey);
-                const sm = getCalculatedMetrics(filtered);
-                
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[var(--surface-soft)] transition-colors';
-                tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-semibold text-[var(--text)] flex items-center gap-2 font-sans">
-                        <span class="w-2.5 h-2.5 rounded-full ${setupKey === 'TJL' ? 'bg-purple-500' : setupKey === 'QML' ? 'bg-cyan-500' : 'bg-amber-500'}"></span>
-                        ${setupKey}
-                    </td>
-                    <td class="py-2.5 px-3">${sm.totalTrades}</td>
-                    <td class="py-2.5 px-3 font-medium ${sm.winRate >= 50 ? 'text-emerald-500' : 'text-amber-500'}">${sm.winRate}%</td>
-                    <td class="py-2.5 px-3 font-semibold ${sm.netPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">$${sm.netPnl.toFixed(2)}</td>
-                    <td class="py-2.5 px-3">${sm.totalR.toFixed(2)} R</td>
-                    <td class="py-2.5 px-3">1:${sm.avgRR}</td>
-                `;
-                setupTable.appendChild(tr);
-            });
-
-            // Equity Curve Chart
-            const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
-            let cumulative = 0;
-            const equityLabels = ['Start'];
-            const equityData = [0];
-
-            sortedTrades.forEach((t, index) => {
-                cumulative += Number(t.pnl) || 0;
-                equityLabels.push(`#${index + 1}`);
-                equityData.push(cumulative);
-            });
-
-            if (chartInstances.equity) chartInstances.equity.destroy();
-            const ctxEquity = document.getElementById('equityChart').getContext('2d');
-            chartInstances.equity = new Chart(ctxEquity, {
-                type: 'line',
-                data: {
-                    labels: equityLabels,
-                    datasets: [{
-                        label: 'Net PnL ($)',
-                        data: equityData,
-                        borderColor: accentColor,
-                        backgroundColor: 'rgba(198, 166, 108, 0.1)',
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } },
-                        y: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } }
-                    }
-                }
-            });
-
-            // Setup Pie Chart
-            const setupCounts = {
-                TJL: trades.filter(t => t.setup === 'TJL').length,
-                QML: trades.filter(t => t.setup === 'QML').length,
-                LQS: trades.filter(t => t.setup === 'LQS').length,
-            };
-
-            if (chartInstances.setupPie) chartInstances.setupPie.destroy();
-            const ctxPie = document.getElementById('setupPieChart').getContext('2d');
-            chartInstances.setupPie = new Chart(ctxPie, {
-                type: 'doughnut',
-                data: {
-                    labels: ['TJL', 'QML', 'LQS'],
-                    datasets: [{
-                        data: [setupCounts.TJL, setupCounts.QML, setupCounts.LQS],
-                        backgroundColor: ['#8b5cf6', '#06b6d4', '#f59e0b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    layout: {
-                        padding: { top: 8, right: 10, bottom: 4, left: 10 }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            align: 'center',
-                            labels: {
-                                color: mutedText,
-                                padding: 16,
-                                boxWidth: 14,
-                                boxHeight: 10,
-                                font: { family: 'Manrope', size: 11 }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // RENDER: TRADES TABLE
-        function renderTradesTable() {
-            const setupFilter = document.getElementById('filter-setup').value;
-            const outcomeFilter = document.getElementById('filter-outcome').value;
-
-            const tbody = document.getElementById('trades-table-body');
-            tbody.innerHTML = '';
-
-            let filtered = [...trades].sort((a,b) => new Date(b.date) - new Date(a.date));
-
-            if (setupFilter !== 'ALL') filtered = filtered.filter(t => t.setup === setupFilter);
-            if (outcomeFilter !== 'ALL') filtered = filtered.filter(t => t.outcome === outcomeFilter);
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="12" class="text-center py-8 text-[var(--muted)] font-sans">No trades logged matching current filters.</td></tr>`;
-                return;
-            }
-
-            filtered.forEach(t => {
-                const risk = Number(t.risk) || 1;
-                const pnl = Number(t.pnl) || 0;
-                const rMultiple = (pnl / risk).toFixed(2);
-
-                const setupBadge = t.setup === 'TJL' 
-                    ? '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold border border-purple-500/30">TJL</span>'
-                    : t.setup === 'QML' 
-                    ? '<span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/30">QML</span>'
-                    : '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 font-bold border border-amber-500/30">LQS</span>';
-
-                const outcomeBadge = t.outcome === 'WIN' 
-                    ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-semibold border border-emerald-500/30">WIN</span>'
-                    : t.outcome === 'LOSS'
-                    ? '<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-500 font-semibold border border-red-500/30">LOSS</span>'
-                    : '<span class="px-2 py-0.5 rounded ref-surface-soft text-[var(--muted)] font-semibold border ref-border">BE</span>';
-
-                const priceDisplay = (t.entry || t.sl || t.tp) ? `
-                    <div class="font-mono text-[10px] leading-tight space-y-0.5">
-                        <div class="text-[var(--text)]">E: ${t.entry || '-'}</div>
-                        <div class="text-red-500">SL: ${t.sl || '-'}</div>
-                        <div class="text-emerald-500">TP: ${t.tp || '-'}</div>
-                    </div>
-                ` : '<span class="ref-text-muted font-mono text-[10px]">-</span>';
-
-                const chartLink = t.chartUrl ? `
-                    <a href="${t.chartUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[var(--accent)] hover:opacity-80 bg-[var(--accent-soft)] border border-[var(--accent)]/30 px-2 py-1 rounded text-[10px] transition-all">
-                        <i data-lucide="image" class="w-3 h-3"></i>
-                        <span>Chart</span>
-                    </a>
-                ` : '<span class="ref-text-muted text-[10px]">-</span>';
-
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[var(--surface-soft)] transition-colors border-b ref-border';
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-mono text-[var(--text)]">${t.date}</td>
-                    <td class="py-3 px-4 font-bold text-[var(--text)] font-sans">${t.pair}</td>
-                    <td class="py-3 px-4 ${t.type === 'BUY' ? 'text-emerald-500' : 'text-red-500'} font-semibold font-sans">${t.type}</td>
-                    <td class="py-3 px-4 font-sans">${setupBadge}</td>
-                    <td class="py-3 px-4">${priceDisplay}</td>
-                    <td class="py-3 px-4 font-sans">${outcomeBadge}</td>
-                    <td class="py-3 px-4 font-mono">$${risk}</td>
-                    <td class="py-3 px-4 font-mono font-bold ${pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">$${pnl}</td>
-                    <td class="py-3 px-4 font-mono ${pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">${rMultiple} R</td>
-                    <td class="py-3 px-4 font-sans">${chartLink}</td>
-                    <td class="py-3 px-4 text-[var(--muted)] font-sans truncate max-w-xs" title="${t.notes || ''}">${t.notes || '-'}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-            lucide.createIcons();
-        }
-
-        // RENDER: CALENDAR
-        function renderCalendar() {
-            const year = currentCalendarDate.getFullYear();
-            const month = currentCalendarDate.getMonth();
-
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            document.getElementById('cal-month-year').textContent = `${monthNames[month]} ${year}`;
-
-            const firstDayIndex = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            const grid = document.getElementById('calendar-grid');
-            grid.innerHTML = '';
-
-            for (let i = 0; i < firstDayIndex; i++) {
-                const blank = document.createElement('div');
-                blank.className = 'ref-surface-soft rounded p-1 min-h-[70px] opacity-20 border ref-border';
-                grid.appendChild(blank);
-            }
-
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const dayTrades = trades.filter(t => t.date === dateStr);
-                
-                let dayPnl = 0;
-                dayTrades.forEach(t => dayPnl += Number(t.pnl) || 0);
-
-                const dayCell = document.createElement('div');
-                let bgClass = 'ref-surface border-line';
-                if (dayTrades.length > 0) {
-                    bgClass = dayPnl > 0 
-                        ? 'bg-emerald-500/10 border-emerald-500/30' 
-                        : dayPnl < 0 
-                        ? 'bg-red-500/10 border-red-500/30' 
-                        : 'ref-surface-soft border-line';
-                }
-
-                dayCell.className = `${bgClass} border ref-border rounded p-2 min-h-[75px] flex flex-col justify-between transition-all hover:border-[var(--accent)]`;
-                dayCell.innerHTML = `
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="font-bold font-mono text-[var(--text)]">${day}</span>
-                        ${dayTrades.length > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded ref-surface-soft text-[var(--text)] border ref-border font-mono">${dayTrades.length}t</span>` : ''}
-                    </div>
-                    ${dayTrades.length > 0 ? `
-                        <div class="text-right">
-                            <div class="text-xs font-bold font-mono ${dayPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">
-                                ${dayPnl >= 0 ? '+' : ''}$${dayPnl.toFixed(0)}
-                            </div>
-                        </div>
-                    ` : '<div class="text-[9px] ref-text-muted italic">No trades</div>'}
-                `;
-                grid.appendChild(dayCell);
-            }
-        }
-
-        // RENDER: MONTHLY ANALYSIS
-        function renderMonthly() {
-            const selectedMonth = document.getElementById('monthly-select-month').value;
-            const selectedYear = document.getElementById('monthly-select-year').value;
-
-            const monthlyData = {};
-
-            trades.forEach(t => {
-                if(!t.date) return;
-                const monthPart = t.date.substring(5, 7);
-                const yearPart = t.date.substring(0, 4);
-                const monthKey = t.date.substring(0, 7);
-
-                if (selectedMonth !== 'ALL' && monthPart !== selectedMonth) return;
-                if (selectedYear !== 'ALL' && yearPart !== selectedYear) return;
-
-                if (!monthlyData[monthKey]) {
-                    monthlyData[monthKey] = { trades: [], pnl: 0, r: 0 };
-                }
-                monthlyData[monthKey].trades.push(t);
-                monthlyData[monthKey].pnl += Number(t.pnl) || 0;
-                const risk = Number(t.risk) || 1;
-                monthlyData[monthKey].r += (Number(t.pnl) || 0) / risk;
-            });
-
-            const sortedMonths = Object.keys(monthlyData).sort();
-            const labels = [];
-            const pnlValues = [];
-
-            const tbody = document.getElementById('monthly-table-body');
-            tbody.innerHTML = '';
-
-            if (sortedMonths.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-[var(--muted)] font-sans">No monthly data found for selected period.</td></tr>`;
-            }
-
-            sortedMonths.forEach(m => {
-                const data = monthlyData[m];
-                const sm = getCalculatedMetrics(data.trades);
-
-                labels.push(m);
-                pnlValues.push(data.pnl);
-
-                const setupCounts = { TJL: 0, QML: 0, LQS: 0 };
-                data.trades.forEach(t => { if(setupCounts[t.setup] !== undefined) setupCounts[t.setup]++; });
-                const topSetup = Object.keys(setupCounts).reduce((a, b) => setupCounts[a] > setupCounts[b] ? a : b);
-
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[var(--surface-soft)] transition-colors border-b ref-border';
-                tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-mono font-bold text-[var(--text)]">${m}</td>
-                    <td class="py-2.5 px-3">${sm.totalTrades}</td>
-                    <td class="py-2.5 px-3 ${sm.winRate >= 50 ? 'text-emerald-500' : 'text-amber-500'}">${sm.winRate}%</td>
-                    <td class="py-2.5 px-3 font-bold ${data.pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">$${data.pnl.toFixed(2)}</td>
-                    <td class="py-2.5 px-3">${data.r.toFixed(2)} R</td>
-                    <td class="py-2.5 px-3 font-sans"><span class="px-2 py-0.5 rounded ref-surface-soft text-[var(--text)] border ref-border font-semibold text-[10px]">${topSetup}</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            const lineBorder = getCssVar('--line');
-            const mutedText = getCssVar('--muted');
-
-            if (chartInstances.monthlyBar) chartInstances.monthlyBar.destroy();
-            const ctx = document.getElementById('monthlyBarChart').getContext('2d');
-            chartInstances.monthlyBar = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Monthly Net PnL ($)',
-                        data: pnlValues,
-                        backgroundColor: pnlValues.map(v => v >= 0 ? '#10b981' : '#ef4444'),
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } },
-                        y: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } }
-                    }
-                }
-            });
-        }
-
-        // RENDER: YEARLY ANALYSIS
-        function renderYearly() {
-            const selectedYear = document.getElementById('yearly-select-year').value;
-            const yearlyData = {};
-
-            trades.forEach(t => {
-                if(!t.date) return;
-                const yearKey = t.date.substring(0, 4);
-
-                if (selectedYear !== 'ALL' && yearKey !== selectedYear) return;
-
-                if (!yearlyData[yearKey]) {
-                    yearlyData[yearKey] = { trades: [], pnl: 0, r: 0, setups: { TJL: 0, QML: 0, LQS: 0 } };
-                }
-                yearlyData[yearKey].trades.push(t);
-                yearlyData[yearKey].pnl += Number(t.pnl) || 0;
-                const risk = Number(t.risk) || 1;
-                yearlyData[yearKey].r += (Number(t.pnl) || 0) / risk;
-                if(t.setup && yearlyData[yearKey].setups[t.setup] !== undefined) yearlyData[yearKey].setups[t.setup]++;
-            });
-
-            const sortedYears = Object.keys(yearlyData).sort();
-            const labels = sortedYears;
-            const pnlValues = sortedYears.map(y => yearlyData[y].pnl);
-
-            const tbody = document.getElementById('yearly-table-body');
-            tbody.innerHTML = '';
-
-            if (sortedYears.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-[var(--muted)] font-sans">No yearly data found for selected period.</td></tr>`;
-            }
-
-            sortedYears.forEach(y => {
-                const data = yearlyData[y];
-                const sm = getCalculatedMetrics(data.trades);
-
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[var(--surface-soft)] transition-colors border-b ref-border';
-                tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-mono font-bold text-[var(--text)]">${y}</td>
-                    <td class="py-2.5 px-3">${sm.totalTrades}</td>
-                    <td class="py-2.5 px-3 ${sm.winRate >= 50 ? 'text-emerald-500' : 'text-amber-500'}">${sm.winRate}%</td>
-                    <td class="py-2.5 px-3 font-bold ${data.pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}">$${data.pnl.toFixed(2)}</td>
-                    <td class="py-2.5 px-3">${data.r.toFixed(2)} R</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            const accentColor = getCssVar('--accent');
-            const lineBorder = getCssVar('--line');
-            const mutedText = getCssVar('--muted');
-
-            if (chartInstances.yearlyBar) chartInstances.yearlyBar.destroy();
-            const ctxY = document.getElementById('yearlyBarChart').getContext('2d');
-            chartInstances.yearlyBar = new Chart(ctxY, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Yearly PnL ($)',
-                        data: pnlValues,
-                        backgroundColor: accentColor,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } },
-                        y: { grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } }
-                    }
-                }
-            });
-
-            if (chartInstances.yearlySetup) chartInstances.yearlySetup.destroy();
-            const ctxYS = document.getElementById('yearlySetupChart').getContext('2d');
-            chartInstances.yearlySetup = new Chart(ctxYS, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'TJL', data: sortedYears.map(y => yearlyData[y].setups.TJL), backgroundColor: '#8b5cf6' },
-                        { label: 'QML', data: sortedYears.map(y => yearlyData[y].setups.QML), backgroundColor: '#06b6d4' },
-                        { label: 'LQS', data: sortedYears.map(y => yearlyData[y].setups.LQS), backgroundColor: '#f59e0b' }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: true, grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } },
-                        y: { stacked: true, grid: { color: lineBorder }, ticks: { color: mutedText, font: { family: 'JetBrains Mono', size: 10 } } }
-                    },
-                    plugins: { legend: { labels: { color: mutedText, font: { family: 'Manrope', size: 11 } } } }
-                }
-            });
-        }
-
-        // RENDER: LIFETIME ANALYSIS
-        function renderLifetime() {
-            const setups = ['TJL', 'QML', 'LQS'];
-            const lifetimeData = {};
-
-            setups.forEach(s => {
-                const filtered = trades.filter(t => t.setup === s);
-                const sm = getCalculatedMetrics(filtered);
-                lifetimeData[s] = sm;
-
-                const prefix = `lt-${s.toLowerCase()}`;
-                document.getElementById(`${prefix}-count`).textContent = sm.totalTrades;
-                document.getElementById(`${prefix}-wr`).textContent = `${sm.winRate}%`;
-                
-                const pnlEl = document.getElementById(`${prefix}-pnl`);
-                pnlEl.textContent = `$${sm.netPnl.toFixed(2)}`;
-                pnlEl.className = `font-bold ${sm.netPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`;
-                
-                document.getElementById(`${prefix}-r`).textContent = `${sm.totalR.toFixed(2)} R`;
-            });
-
-            const lineBorder = getCssVar('--line');
-            const mutedText = getCssVar('--muted');
-
-            if (chartInstances.lifetimeRadar) chartInstances.lifetimeRadar.destroy();
-            const ctxR = document.getElementById('lifetimeRadarChart').getContext('2d');
-            chartInstances.lifetimeRadar = new Chart(ctxR, {
-                type: 'radar',
-                data: {
-                    labels: ['Win Rate %', 'Total R (x10)', 'Total Trades', 'Avg Risk/Reward (x10)'],
-                    datasets: [
-                        {
-                            label: 'TJL',
-                            data: [
-                                lifetimeData.TJL.winRate, 
-                                lifetimeData.TJL.totalR * 10, 
-                                lifetimeData.TJL.totalTrades, 
-                                lifetimeData.TJL.avgRR * 10
-                            ],
-                            borderColor: '#8b5cf6',
-                            backgroundColor: 'rgba(139, 92, 246, 0.15)',
-                        },
-                        {
-                            label: 'QML',
-                            data: [
-                                lifetimeData.QML.winRate, 
-                                lifetimeData.QML.totalR * 10, 
-                                lifetimeData.QML.totalTrades, 
-                                lifetimeData.QML.avgRR * 10
-                            ],
-                            borderColor: '#06b6d4',
-                            backgroundColor: 'rgba(6, 182, 212, 0.15)',
-                        },
-                        {
-                            label: 'LQS',
-                            data: [
-                                lifetimeData.LQS.winRate, 
-                                lifetimeData.LQS.totalR * 10, 
-                                lifetimeData.LQS.totalTrades, 
-                                lifetimeData.LQS.avgRR * 10
-                            ],
-                            borderColor: '#f59e0b',
-                            backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        r: {
-                            angleLines: { color: lineBorder },
-                            grid: { color: lineBorder },
-                            pointLabels: { color: mutedText, font: { family: 'Manrope', size: 10 } },
-                            ticks: { display: false }
-                        }
-                    },
-                    plugins: { legend: { labels: { color: mutedText, font: { family: 'Manrope', size: 11 } } } }
-                }
-            });
-        }
-
-        // MODAL & CRUD HANDLERS
-        function setupModalListeners() {
-            // Read-Only mode: Disable modal setup
-        }
-
-        function setupFilterListeners() {
-            document.getElementById('filter-setup').addEventListener('change', renderTradesTable);
-            document.getElementById('filter-outcome').addEventListener('change', renderTradesTable);
-
-            document.getElementById('monthly-select-month').addEventListener('change', renderMonthly);
-            document.getElementById('monthly-select-year').addEventListener('change', renderMonthly);
-            document.getElementById('yearly-select-year').addEventListener('change', renderYearly);
-        }
-
-        function setupCalendarListeners() {
-            document.getElementById('cal-prev').addEventListener('click', () => {
-                currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-                renderCalendar();
-            });
-            document.getElementById('cal-next').addEventListener('click', () => {
-                currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-                renderCalendar();
-            });
-        }
-
-        // Inline Table Row Actions
-        window.editTrade = function(id) {
-            const t = trades.find(item => item.id === id);
-            if (!t) return;
-
-            document.getElementById('tradeId').value = t.id;
-            document.getElementById('tradeDate').value = t.date;
-            document.getElementById('tradePair').value = t.pair;
-            document.getElementById('tradeType').value = t.type;
-            document.getElementById('tradeSetup').value = t.setup;
-            document.getElementById('tradeEntry').value = t.entry || '';
-            document.getElementById('tradeSl').value = t.sl || '';
-            document.getElementById('tradeTp').value = t.tp || '';
-            document.getElementById('tradeChartUrl').value = t.chartUrl || '';
-            document.getElementById('tradeOutcome').value = t.outcome;
-            document.getElementById('tradeRisk').value = t.risk;
-            document.getElementById('tradePnl').value = t.pnl;
-            document.getElementById('tradeNotes').value = t.notes || '';
-
-            document.getElementById('modalTitle').textContent = 'Edit Execution Log';
-            document.getElementById('tradeModal').classList.remove('hidden');
-        };
-
-        window.deleteTrade = function(id) {
-            const tradeToDelete = trades.find(t => t.id === id);
-            trades = trades.filter(t => t.id !== id);
-            saveTrades(tradeToDelete, 'DELETE');
-        };
-    </script>
-</body>
-</html>
+  window.addEventListener('DOMContentLoaded',applyReadOnly);
+  const obs=new MutationObserver(applyReadOnly);
+  window.addEventListener('DOMContentLoaded',()=>obs.observe(document.body,{childList:true,subtree:true}));
+  // Hard guard against accidental direct invocation.
+  const blocked=['openTradeModal','handleTradeSubmit','editTrade','confirmDeleteTrade','openWithdrawModal','handleWithdrawSubmit','confirmDeleteWithdrawal','saveSettings','promptEditBalance'];
+  blocked.forEach(name=>{
+    try{ window[name]=function(){ return false; }; }catch(e){}
+  });
+})();
+</script>
+  <script>
+let trades=JSON.parse(localStorage.getItem('etherealneel_trades'))||[];
+let withdrawals=JSON.parse(localStorage.getItem('etherealneel_withdrawals'))||[];
+let startingBalance=parseFloat(localStorage.getItem('etherealneel_start_balance'))||1000.00;
+let faviconUrl=localStorage.getItem('etherealneel_favicon_url')||'';
+const cloudAppUrl='https://script.google.com/macros/s/AKfycbygxtd-W2Gazl21eN_9oABG_zrKyrrzQp41m3Fm0-yAcsJTYjXTl6z0Xgetd4i3A8w2/exec';
+let activeView='dashboard',chartMode='equity',equityChartInstance=null,strategyChartInstance=null,activeConfirmCallback=null;
+const today=new Date();let calendarMonth=new Date(today.getFullYear(),today.getMonth(),1),calendarSelectedDate=dateKey(today);
+const byId=id=>document.getElementById(id);
+window.addEventListener('DOMContentLoaded',()=>{lucide.createIcons();applySettings();initCharts();renderAll();byId('tradeDateTime').value=localDateTime();updateCloudBadgeStatus();if(cloudAppUrl)pullFromCloud(true)});
+function localDateTime(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function dateKey(value){if(!value)return '';const raw=String(value);if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(value);return isNaN(d.getTime())?'':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function safeText(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function calendarActivity(){const days=new Map();const add=(item,type)=>{const key=dateKey(item.datetime);if(!key)return;if(!days.has(key))days.set(key,{trades:[],withdrawals:[]});days.get(key)[type].push(item)};trades.forEach(x=>add(x,'trades'));withdrawals.forEach(x=>add(x,'withdrawals'));return days}
+function renderCalendar(){const grid=byId('calendarGrid');byId('calendarMonthHeading').textContent=new Intl.DateTimeFormat('en',{month:'long',year:'numeric'}).format(calendarMonth);const first=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth(),1),offset=(first.getDay()+6)%7,count=new Date(first.getFullYear(),first.getMonth()+1,0).getDate(),slots=Math.ceil((offset+count)/7)*7,days=calendarActivity(),currentKey=dateKey(new Date()),seen=new Set();for(let i=0;i<slots;i++){const date=new Date(first.getFullYear(),first.getMonth(),i-offset+1),key=dateKey(date),activity=days.get(key);let cell=grid.querySelector(`[data-date="${key}"]`);if(!cell){cell=document.createElement('button');cell.type='button';cell.className='calendar-cell';cell.dataset.date=key;cell.addEventListener('click',()=>selectCalendarDate(key));grid.appendChild(cell)}seen.add(key);cell.className=`calendar-cell${date.getMonth()===first.getMonth()?'':' outside'}${key===calendarSelectedDate?' selected':''}${key===currentKey?' today':''}`;cell.setAttribute('aria-pressed',String(key===calendarSelectedDate));cell.setAttribute('aria-label',`${new Intl.DateTimeFormat('en',{dateStyle:'full'}).format(date)}: ${activity?.trades.length||0} trades, ${activity?.withdrawals.length||0} withdrawals`);const pnl=activity?.trades.reduce((sum,t)=>sum+(parseFloat(t.pnl)||0),0)||0;cell.innerHTML=`<span class="day-number">${date.getDate()}</span>${activity?.trades.length?`<span class="cal-count">● ${activity.trades.length} trade${activity.trades.length===1?'':'s'}</span>`:''}${activity?.withdrawals.length?`<span class="cal-count cal-withdraw">● ${activity.withdrawals.length} payout${activity.withdrawals.length===1?'':'s'}</span>`:''}${activity?.trades.length?`<span class="cal-pnl ${pnl<0?'negative':'positive'}">${pnl>=0?'+':''}${safeText(formatCurrency(pnl))}</span>`:''}`}grid.querySelectorAll('[data-date]').forEach(cell=>{if(!seen.has(cell.dataset.date))cell.remove()});renderCalendarDay()}
+function selectCalendarDate(key){calendarSelectedDate=key;const[y,m]=key.split('-').map(Number);if(calendarMonth.getFullYear()!==y||calendarMonth.getMonth()!==m-1)calendarMonth=new Date(y,m-1,1);renderCalendar()}
+function changeCalendarMonth(delta){calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+delta,1);calendarSelectedDate=dateKey(calendarMonth);renderCalendar()}
+function renderCalendarDay(){const[y,m,d]=calendarSelectedDate.split('-').map(Number),date=new Date(y,m-1,d);byId('calendarSelectedHeading').textContent=new Intl.DateTimeFormat('en',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(date);const events=calendarActivity().get(calendarSelectedDate)||{trades:[],withdrawals:[]},total=events.trades.reduce((sum,t)=>sum+(parseFloat(t.pnl)||0),0);byId('calendarDaySummary').textContent=`${events.trades.length} trade${events.trades.length===1?'':'s'} · ${events.withdrawals.length} withdrawal${events.withdrawals.length===1?'':'s'}${events.trades.length?' · Net '+(total>=0?'+':'')+formatCurrency(total):''}`;const items=[...events.trades.map(item=>({type:'trade',item})),...events.withdrawals.map(item=>({type:'withdrawal',item}))].sort((a,b)=>new Date(a.item.datetime||0)-new Date(b.item.datetime||0));const area=byId('calendarDayEvents');if(!items.length){area.innerHTML='<p class="rounded-xl bg-[#f1f6f7] p-5 text-sm text-[#617283]">No journal activity recorded for this date.</p>';return}area.innerHTML=items.map(({type,item})=>{const time=item.datetime?new Date(item.datetime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';if(type==='withdrawal')return `<div class="day-activity withdrawal"><div class="flex justify-between gap-2 text-sm font-bold"><span>Withdrawal</span><span class="text-[#a16c19]">-${safeText(formatCurrency(parseFloat(item.amount)||0))}</span></div><div class="text-xs text-[#617283] mt-1">${safeText(time)}${item.note?' · '+safeText(item.note):''}</div></div>`;const pnl=parseFloat(item.pnl)||0;return `<div class="day-activity"><div class="flex justify-between gap-2 text-sm font-bold"><span>${safeText(item.pair||'Trade')} <span class="text-xs font-medium text-[#617283]">${safeText(item.direction||'')} · ${safeText(item.outcome||'')}</span></span><span class="${pnl<0?'text-[#be5260]':'text-[#087e79]'}">${pnl>=0?'+':''}${safeText(formatCurrency(pnl))}</span></div><div class="text-xs text-[#617283] mt-1">${safeText(time)} · ${safeText(item.session||'—')} · ${safeText(item.strategy||'—')}</div>${item.notes?`<p class="text-xs mt-2 text-[#31475a] whitespace-pre-wrap break-words">${safeText(item.notes)}</p>`:''}</div>`}).join('')}
+function switchView(name){activeView=name;const views={dashboard:'viewDashboard',trades:'viewAllTrades',calendar:'viewCalendar'},buttons={dashboard:'navTabDashboard',trades:'navTabTrades',calendar:'navTabCalendar'};Object.keys(views).forEach(key=>{byId(views[key]).classList.toggle('hidden',key!==name);const button=byId(buttons[key]);button.classList.toggle('journal-nav-active',key===name);button.classList.toggle('journal-nav-inactive',key!==name);if(key===name)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current')});if(name==='trades')renderAllTradesPage();if(name==='calendar')renderCalendar();if(name==='dashboard'){requestAnimationFrame(()=>{equityChartInstance?.resize();strategyChartInstance?.resize()})}window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})}
+function showToast(message,type='success'){const toast=document.createElement('div');toast.className=`px-3.5 py-2 rounded-xl shadow-md text-xs border pointer-events-auto animate-toast ${type==='error'?'bg-rose-50 border-rose-300 text-rose-800':type==='info'?'bg-sky-50 border-sky-300 text-sky-900':'bg-emerald-50 border-emerald-300 text-emerald-800'}`;toast.textContent=message;byId('toastContainer').appendChild(toast);setTimeout(()=>{toast.style.opacity='0';setTimeout(()=>toast.remove(),200)},2500)}
+function applySettings(){byId('statStartBalance').textContent=formatCurrency(startingBalance);const logo=document.querySelector('[data-template-id="brand-logo"]'),selected=faviconUrl||logo.src;if(selected)byId('appFavicon').href=selected}
+function renderAll(){updateMetrics();updateCharts();renderAllTradesPage();renderCalendar()}
+function setEquityChartMode(mode){chartMode=mode;[['btnChartModeEquity','equity'],['btnChartModePnL','pnl']].forEach(([id,key])=>{const el=byId(id);el.classList.toggle('bg-[#087e79]',mode===key);el.classList.toggle('text-white',mode===key);el.classList.toggle('font-bold',mode===key);el.classList.toggle('bg-[#f1f6f7]',mode!==key);el.classList.toggle('text-[#243b4a]',mode!==key);el.classList.toggle('border',mode!==key)});updateCharts()}
+function updateMetrics(){let wins=0,losses=0,breakEvens=0,grossWins=0,grossLosses=0,totalNetPnL=0;trades.forEach(t=>{const comm=parseFloat(t.commission)||0,pnl=parseFloat(t.pnl)||0;totalNetPnL+=pnl;if(t.outcome==='Win'){wins++;grossWins+=pnl+comm}else if(t.outcome==='Loss'){losses++;grossLosses+=Math.abs(pnl-comm)}else if(t.outcome==='Break-Even')breakEvens++});const totalWithdrawals=withdrawals.reduce((sum,w)=>sum+(parseFloat(w.amount)||0),0),returnPct=startingBalance>0?totalNetPnL/startingBalance*100:0,decided=wins+losses,winRate=decided?wins/decided*100:0,factor=grossLosses?grossWins/grossLosses:grossWins?99.99:0,expectancy=decided?totalNetPnL/decided:0;byId('statEquity').textContent=formatCurrency(startingBalance+totalNetPnL-totalWithdrawals);const badge=byId('statReturnBadge');badge.textContent=`${returnPct>=0?'+':''}${returnPct.toFixed(2)}%`;badge.className=returnPct>=0?'text-[#087e79] font-bold':'text-[#be5260] font-bold';byId('statNetProfitSub').textContent=formatCurrency(totalNetPnL);byId('statNetProfitSub').style.color=totalNetPnL<0?'#be5260':totalNetPnL>0?'#087e79':'#182b3c';byId('statTotalWithdrawals').textContent=formatCurrency(totalWithdrawals);byId('statWithdrawalCount').textContent=`${withdrawals.length} Withdrawal${withdrawals.length===1?'':'s'}`;byId('statWinRate').textContent=`${winRate.toFixed(1)}%`;byId('statWinLossRatio').textContent=`${wins} W / ${losses} L`;byId('statProfitFactor').textContent=factor.toFixed(2);byId('statExpectancy').textContent=`Exp: ${expectancy>=0?'+':''}${formatCurrency(expectancy)}`;byId('statTotalTrades').textContent=trades.length;byId('statBECount').textContent=`${breakEvens} Break-even`}
+function initCharts(){const eq=byId('equityChart').getContext('2d');equityChartInstance=new Chart(eq,{type:'line',data:{labels:[],datasets:[{label:'Equity ($)',data:[],borderColor:'#2383ae',backgroundColor:'rgba(35,131,174,.09)',borderWidth:2.5,fill:true,tension:.22,pointRadius:[],pointBackgroundColor:[],pointBorderColor:[]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#edf1f2'},ticks:{color:'#617283',font:{size:10}}},y:{grid:{color:'#edf1f2'},ticks:{color:'#617283',font:{size:10},callback:val=>'$'+val}}}}});strategyChartInstance=new Chart(byId('strategyChart').getContext('2d'),{type:'doughnut',data:{labels:[],datasets:[{data:[],backgroundColor:['#2383ae','#087e79','#485bb0','#a16c19','#be5260','#48aac4','#7786c9','#df8072'],borderWidth:3,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'67%',plugins:{legend:{position:'bottom',labels:{color:'#31475a',font:{size:10},boxWidth:9,padding:12}}}}})}
+function updateCharts(){if(!equityChartInstance||!strategyChartInstance)return;const events=[];trades.filter(t=>t.outcome!=='Pending').forEach(t=>events.push({type:'trade',datetime:t.datetime||new Date().toISOString(),pnl:parseFloat(t.pnl)||0}));if(chartMode==='equity')withdrawals.forEach(w=>events.push({type:'withdrawal',datetime:w.datetime||new Date().toISOString(),amount:parseFloat(w.amount)||0}));events.sort((a,b)=>new Date(a.datetime)-new Date(b.datetime));let balance=startingBalance,peak=startingBalance,dd=0;const labels=['Start'],points=[startingBalance],radii=[4],colors=['#2383ae'];events.forEach((ev,i)=>{if(ev.type==='trade'){balance+=ev.pnl;labels.push(`#${i+1}`);radii.push(4);colors.push(ev.pnl>=0?'#087e79':'#be5260')}else{balance-=ev.amount;labels.push('Payout');radii.push(5);colors.push('#a16c19')}points.push(balance);if(balance>peak)peak=balance;else if(peak>0)dd=Math.max(dd,(peak-balance)/peak*100)});byId('statPeakEquity').textContent=formatCurrency(peak);byId('statMaxDDVal').textContent=`${dd.toFixed(2)}%`;const dataset=equityChartInstance.data.datasets[0];equityChartInstance.data.labels=labels;dataset.data=points;dataset.pointRadius=radii;dataset.pointBackgroundColor=colors;equityChartInstance.update();const counts={};trades.forEach(t=>{const s=t.strategy||'Other';counts[s]=(counts[s]||0)+1});const keys=Object.keys(counts);strategyChartInstance.data.labels=keys.length?keys:['No Executions'];strategyChartInstance.data.datasets[0].data=keys.length?Object.values(counts):[1];strategyChartInstance.data.datasets[0].backgroundColor=keys.length?['#2383ae','#087e79','#485bb0','#a16c19','#be5260','#48aac4','#7786c9','#df8072']:['#e2e8e9'];byId('statTopStrategy').textContent=keys.length?Object.entries(counts).reduce((a,b)=>a[1]>b[1]?a:b)[0]:'-';strategyChartInstance.update()}
+function getFilteredTrades(){const search=byId('filterSearch').value.toLowerCase(),strategy=byId('filterStrategy').value,session=byId('filterSession').value,direction=byId('filterDirection').value,outcome=byId('filterOutcome').value;return trades.filter(t=>((t.pair||'').toLowerCase().includes(search)||(t.strategy||'').toLowerCase().includes(search)||(t.notes||'').toLowerCase().includes(search))&&(strategy==='ALL'||t.strategy===strategy)&&(session==='ALL'||t.session===session)&&(direction==='ALL'||t.direction===direction)&&(outcome==='ALL'||t.outcome===outcome)).sort((a,b)=>new Date(b.datetime||0)-new Date(a.datetime||0))}
+function renderAllTradesPage(){const filtered=getFilteredTrades(),body=byId('allTradesTableBody');body.innerHTML=filtered.map(generateTradeRowHTML).join('');byId('emptyFullTableState').classList.toggle('hidden',filtered.length>0);byId('paginationInfo').textContent=filtered.length?`Total: ${filtered.length} trade${filtered.length===1?'':'s'} logged`:'Total: 0 trades logged'}
+function handleFilterChange(){renderAllTradesPage()}
+function generateTradeRowHTML(t){const date=t.datetime?new Date(t.datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-',badge=t.outcome==='Win'?'<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">WIN</span>':t.outcome==='Loss'?'<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">LOSS</span>':t.outcome==='Break-Even'?'<span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-800 font-bold text-[10px]">BE</span>':'',id=JSON.stringify(String(t.id)).replace(/"/g,'&quot;'),pnl=parseFloat(t.pnl)||0;return `<tr><td class="py-3 px-3">${safeText(date)}</td><td class="py-3 px-3 font-bold">${safeText(t.pair||'-')} ${badge}</td><td class="py-3 px-3 ${t.direction==='BUY'?'text-[#087e79]':'text-[#be5260]'} font-bold">${safeText(t.direction||'-')}</td><td class="py-3 px-3">${safeText(t.session||'-')}</td><td class="py-3 px-3"><span class="bg-[#f1f6f7] px-1.5 py-0.5 rounded">${safeText(t.strategy||'-')}</span></td><td class="py-3 px-3">${safeText(t.entry||'-')} / ${safeText(t.sl||'-')} / ${safeText(t.tp||'-')}</td><td class="py-3 px-3 font-bold text-[#a16c19]">1:${safeText(t.rr||'0.00')}</td><td class="py-3 px-3">${(parseFloat(t.risk)||0).toFixed(2)}</td><td class="py-3 px-3">${(parseFloat(t.commission)||0).toFixed(2)}</td><td class="py-3 px-3 font-bold ${pnl<0?'text-[#be5260]':'text-[#087e79]'}">${pnl>=0?'+':''}${formatCurrency(pnl)}</td><td class="py-3 px-3 text-center">${t.chartDataUrl||t.chartUrl?`<button type="button" onclick="viewChart(${id})" title="View Chart" aria-label="View trade chart" class="text-[#2383ae]"><i class="fa-solid fa-image"></i></button>`:'-'}</td><td class="py-3 px-3 text-right"><button type="button" onclick="editTrade(${id})" title="Edit Trade" aria-label="Edit trade" class="text-[#617283] p-1"><i class="fa-solid fa-pen-to-square"></i></button><button type="button" onclick="confirmDeleteTrade(${id})" title="Delete Trade" aria-label="Delete trade" class="text-[#be5260] p-1"><i class="fa-solid fa-trash-can"></i></button></td></tr>`}
+function calcFormMetrics(){const entry=parseFloat(byId('tradeEntry').value)||0,sl=parseFloat(byId('tradeSL').value)||0,tp=parseFloat(byId('tradeTP').value)||0,risk=parseFloat(byId('tradeRisk').value)||0,comm=parseFloat(byId('tradeCommission').value)||0,outcome=byId('tradeOutcome').value;let rr=0;if(entry>0&&sl>0&&tp>0&&entry!==sl)rr=Math.abs(tp-entry)/Math.abs(entry-sl);const pnl=outcome==='Win'?risk*rr-comm:outcome==='Loss'?-risk-comm:-comm;byId('previewRR').textContent=`1 : ${rr.toFixed(2)}`;byId('previewPnL').textContent=`${pnl>=0?'+':''}${formatCurrency(pnl)}`;byId('previewPnL').style.color=pnl<0?'#be5260':pnl>0?'#087e79':'#31475a'}
+function handleTradeSubmit(e){e.preventDefault();const id=byId('tradeId').value,entry=parseFloat(byId('tradeEntry').value)||0,sl=parseFloat(byId('tradeSL').value)||0,tp=parseFloat(byId('tradeTP').value)||0,risk=parseFloat(byId('tradeRisk').value)||0,comm=parseFloat(byId('tradeCommission').value)||0,outcome=byId('tradeOutcome').value;let rr=0;if(entry>0&&sl>0&&tp>0&&entry!==sl)rr=Math.abs(tp-entry)/Math.abs(entry-sl);const pnl=outcome==='Win'?risk*rr-comm:outcome==='Loss'?-risk-comm:-comm,trade={id:id||'t_'+Date.now(),datetime:byId('tradeDateTime').value,pair:byId('tradePair').value,session:byId('tradeSession').value,direction:byId('tradeDirection').value,strategy:byId('tradeStrategy').value,outcome,entry,sl,tp,risk,commission:comm,rr:rr.toFixed(2),pnl,notes:byId('tradeNotes').value,chartUrl:byId('tradeChartUrl').value,chartDataUrl:byId('tradeChartDataUrl').value};if(id){const index=trades.findIndex(t=>t.id===id);if(index!==-1)trades[index]=trade;showToast('Trade updated successfully')}else{trades.unshift(trade);showToast('New trade logged')}saveTradesToStorage();closeTradeModal();renderAll();pushSingleTradeToCloud(trade)}
+function editTrade(id){const t=trades.find(x=>x.id===id);if(!t)return;byId('tradeId').value=t.id;byId('modalTitle').textContent='Edit Trade';['datetime','pair','session','direction','strategy','outcome','entry','sl','tp','risk','commission','notes','chartUrl','chartDataUrl'].forEach((key,i)=>{byId(['tradeDateTime','tradePair','tradeSession','tradeDirection','tradeStrategy','tradeOutcome','tradeEntry','tradeSL','tradeTP','tradeRisk','tradeCommission','tradeNotes','tradeChartUrl','tradeChartDataUrl'][i]).value=t[key]??''});calcFormMetrics();byId('tradeModal').classList.remove('hidden')}
+function confirmDeleteTrade(id){showCustomConfirm('Delete Trade','Are you sure you want to delete this trade log?',confirmed=>{if(confirmed){trades=trades.filter(t=>t.id!==id);saveTradesToStorage();renderAll();showToast('Trade deleted','info');deleteTradeFromCloud(id)}})}
+function viewChart(id){const t=trades.find(x=>x.id===id);if(!t)return;const src=t.chartDataUrl||t.chartUrl;if(!src)return;if(t.chartUrl&&!t.chartDataUrl)window.open(t.chartUrl,'_blank','noopener,noreferrer');else{byId('chartPreviewImage').src=src;byId('chartPreviewModal').classList.remove('hidden')}}
+function closeChartPreviewModal(){byId('chartPreviewModal').classList.add('hidden')}
+function openWithdrawModal(editId=null){const w=editId?withdrawals.find(x=>x.id===editId):null;byId('withdrawId').value=w?.id||'';byId('withdrawModalTitle').textContent=w?'Edit Withdrawal':'Record Withdrawal';byId('withdrawDateTime').value=w?.datetime||localDateTime();byId('withdrawAmount').value=w?.amount||'';byId('withdrawNote').value=w?.note||'';byId('withdrawModal').classList.remove('hidden')}
+function closeWithdrawModal(){byId('withdrawModal').classList.add('hidden')}
+function handleWithdrawSubmit(e){e.preventDefault();const id=byId('withdrawId').value,amount=parseFloat(byId('withdrawAmount').value)||0;if(amount<=0)return;const w={id:id||'w_'+Date.now(),datetime:byId('withdrawDateTime').value,amount,note:byId('withdrawNote').value};if(id){const i=withdrawals.findIndex(x=>x.id===id);if(i!==-1)withdrawals[i]=w;showToast('Withdrawal updated','info')}else{withdrawals.push(w);showToast(`Payout of $${amount.toFixed(2)} recorded!`,'info')}saveWithdrawalsToStorage();closeWithdrawModal();renderAll();pushWithdrawalToCloud(w)}
+function openWithdrawListModal(){const area=byId('withdrawListContainer');if(!withdrawals.length)area.innerHTML='<div class="p-4 text-center text-xs text-[#617283]">No withdrawals recorded yet.</div>';else area.innerHTML=[...withdrawals].sort((a,b)=>new Date(b.datetime)-new Date(a.datetime)).map(w=>{const date=new Date(w.datetime).toLocaleString([],{month:'short',day:'numeric',year:'numeric'}),id=JSON.stringify(String(w.id)).replace(/"/g,'&quot;');return `<div class="p-3 bg-[#f6f9f8] border border-[#e3e9eb] rounded-xl flex justify-between items-center gap-2"><div><div class="font-bold text-[#a16c19]">-${formatCurrency(w.amount)}</div><div class="text-[10px] text-[#617283]">${safeText(date)} ${w.note?'· '+safeText(w.note):''}</div></div><div class="flex gap-1"><button type="button" onclick="openWithdrawModal(${id});closeWithdrawListModal()" aria-label="Edit withdrawal" class="p-1"><i class="fa-solid fa-pen-to-square"></i></button><button type="button" onclick="confirmDeleteWithdrawal(${id})" aria-label="Delete withdrawal" class="text-[#be5260] p-1"><i class="fa-solid fa-trash-can"></i></button></div></div>`}).join('');byId('withdrawListModal').classList.remove('hidden')}
+function closeWithdrawListModal(){byId('withdrawListModal').classList.add('hidden')}
+function confirmDeleteWithdrawal(id){showCustomConfirm('Delete Withdrawal','Are you sure you want to delete this payout record?',confirmed=>{if(confirmed){withdrawals=withdrawals.filter(w=>w.id!==id);saveWithdrawalsToStorage();renderAll();openWithdrawListModal();showToast('Withdrawal deleted','info');deleteWithdrawalFromCloud(id)}})}
+function saveWithdrawalsToStorage(){localStorage.setItem('etherealneel_withdrawals',JSON.stringify(withdrawals))}
+function saveTradesToStorage(){localStorage.setItem('etherealneel_trades',JSON.stringify(trades))}
+function openTradeModal(){byId('tradeForm').reset();byId('tradeId').value='';byId('tradeChartDataUrl').value='';byId('modalTitle').textContent='Log Trade Execution';byId('tradeDateTime').value=localDateTime();calcFormMetrics();byId('tradeModal').classList.remove('hidden')}
+function closeTradeModal(){byId('tradeModal').classList.add('hidden')}
+function openSettingsModal(){byId('settingStartBalance').value=startingBalance;byId('settingCloudUrl').value=cloudAppUrl;byId('settingsModal').classList.remove('hidden')}
+function closeSettingsModal(){byId('settingsModal').classList.add('hidden')}
+function saveSettings(e){e.preventDefault();startingBalance=parseFloat(byId('settingStartBalance').value)||1000;localStorage.setItem('etherealneel_start_balance',startingBalance);applySettings();updateCloudBadgeStatus();closeSettingsModal();renderAll();showToast('Settings saved');if(cloudAppUrl)manualSyncCloud()}
+function promptEditBalance(){showCustomPrompt('Starting Account Balance ($):',val=>{if(val!==null&&!isNaN(parseFloat(val))){startingBalance=parseFloat(val);localStorage.setItem('etherealneel_start_balance',startingBalance);applySettings();renderAll();showToast('Starting balance updated');pushFullSyncToCloud()}},startingBalance)}
+function formatCurrency(val){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(val)}
+function showCustomConfirm(title,message,callback){byId('confirmTitle').textContent=title;byId('confirmMessage').textContent=message;byId('confirmInputContainer').classList.add('hidden');activeConfirmCallback=callback;byId('confirmModal').classList.remove('hidden')}
+function showCustomPrompt(message,callback,defaultValue=''){byId('confirmTitle').textContent='Input Required';byId('confirmMessage').textContent=message;byId('confirmInputContainer').classList.remove('hidden');byId('confirmInput').value=defaultValue;activeConfirmCallback=confirmed=>callback(confirmed?byId('confirmInput').value:null);byId('confirmModal').classList.remove('hidden');byId('confirmInput').focus()}
+function closeConfirmModal(result){byId('confirmModal').classList.add('hidden');if(activeConfirmCallback){const callback=activeConfirmCallback;activeConfirmCallback=null;callback(result)}}
+function handleImageFileUpload(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=evt=>{byId('tradeChartDataUrl').value=evt.target.result};reader.readAsDataURL(file)}
+function updateCloudBadgeStatus(state='local'){const badge=byId('cloudStatusBadge'),icon=byId('cloudSyncBtnIcon');if(state==='syncing'){badge.className='inline-flex items-center gap-1 text-[11px] font-medium text-[#2383ae] bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200';badge.innerHTML='<i class="fa-solid fa-arrows-rotate fa-spin"></i> Syncing...';icon.className='fa-solid fa-arrows-rotate fa-spin text-[#2383ae]'}else if(state==='connected'||(cloudAppUrl&&state==='local')){badge.className='inline-flex items-center gap-1 text-[11px] font-medium text-[#087e79] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200';badge.innerHTML='<i class="fa-solid fa-cloud-check"></i> Connected';icon.className='fa-solid fa-rotate text-[#087e79]'}else if(state==='error'){badge.className='inline-flex items-center gap-1 text-[11px] font-medium text-[#be5260] bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200';badge.innerHTML='<i class="fa-solid fa-cloud-exclamation"></i> Sync Error';icon.className='fa-solid fa-triangle-exclamation text-[#be5260]'}else{badge.className='inline-flex items-center gap-1 text-[11px] font-medium text-[#a16c19] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200';badge.innerHTML='<i class="fa-solid fa-cloud"></i> Local Storage';icon.className='fa-solid fa-rotate text-[#617283]'}}
+async function sendCloudRequest(payload){if(!cloudAppUrl)return null;updateCloudBadgeStatus('syncing');try{const res=await fetch(cloudAppUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)}),result=await res.json();if(result&&result.status==='success'){updateCloudBadgeStatus('connected');return result}throw new Error(result.message||'Server error')}catch(err){updateCloudBadgeStatus('error');return null}}
+async function manualSyncCloud(){if(!cloudAppUrl){showToast('Cloud Web App URL is not configured.','error');return}showToast('Syncing with Google Sheet...','info');await pushFullSyncToCloud()}
+async function pushFullSyncToCloud(){if(!cloudAppUrl)return;const result=await sendCloudRequest({action:'SYNC_ALL',trades,withdrawals,startingBalance});if(result)showToast('Synced to Google Sheets!')}
+async function pullFromCloud(silent=false){if(!cloudAppUrl)return;updateCloudBadgeStatus('syncing');try{const res=await fetch(`${cloudAppUrl}?action=GET_ALL`),result=await res.json();if(result&&result.status==='success'&&result.data){trades=result.data.trades||trades;withdrawals=result.data.withdrawals||withdrawals;if(result.data.startingBalance)startingBalance=parseFloat(result.data.startingBalance);saveTradesToStorage();saveWithdrawalsToStorage();localStorage.setItem('etherealneel_start_balance',startingBalance);applySettings();renderAll();updateCloudBadgeStatus('connected');if(!silent)showToast('Data loaded from Google Sheets!')}}catch(err){updateCloudBadgeStatus('error');if(!silent)showToast('Failed to pull from Cloud.','error')}}
+async function pushSingleTradeToCloud(trade){if(cloudAppUrl)await sendCloudRequest({action:'SAVE_TRADE',trade})}
+async function deleteTradeFromCloud(id){if(cloudAppUrl)await sendCloudRequest({action:'DELETE_TRADE',id})}
+async function pushWithdrawalToCloud(withdrawal){if(cloudAppUrl)await sendCloudRequest({action:'SAVE_WITHDRAWAL',withdrawal})}
+async function deleteWithdrawalFromCloud(id){if(cloudAppUrl)await sendCloudRequest({action:'DELETE_WITHDRAWAL',id})}
+</script>
+ 
+</body></html>
